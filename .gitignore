@@ -12,4 +12,5 @@ dist/
 build/
 *.egg-info/
 postgres-data/
-
+frontend/node_modules/
+app/static/frontend/

@@ -48,8 +48,8 @@ def test_sample_scan_endpoint_scans_all_sample_scenarios(client: TestClient) -> 
     assert response.status_code == 200
     scan = response.json()
     assert scan["label"] == "Sample local IaC scan"
-    assert scan["files_scanned"] == 8
-    assert scan["findings_count"] == 7
+    assert scan["files_scanned"] == 10
+    assert scan["findings_count"] == 55
     assert scan["risk_score"] == 0
 
 
@@ -62,15 +62,8 @@ def test_dashboard_renders_latest_scan(client: TestClient) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Enterprise Security Guardrail Auditor" in response.text
-    assert "Scan Files" in response.text
-    assert "data-severity-filter=\"critical\"" in response.text
-    assert "Search findings" in response.text
-    assert "Findings pagination" in response.text
-    assert "Clear" in response.text
-    assert "/api/scans/upload" in response.text
-    assert "JSON-only fixture scan" in response.text
-    assert "50" in response.text
+    assert '<div id="root"></div>' in response.text
+    assert "/static/frontend/assets/" in response.text
 
 
 def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestClient) -> None:
@@ -147,6 +140,7 @@ def test_rules_endpoint_lists_supported_rules(client: TestClient) -> None:
         "S3_PUBLIC_ACL",
         "IAM_WILDCARD_POLICY",
         "DATABASE_ENCRYPTION_DISABLED",
+        "S3_VERSIONING_DISABLED",
     }.issubset(rule_ids)
 
 

@@ -7,6 +7,8 @@ This project is intentionally local-only. It does not create AWS, Azure, or othe
 ## Stack
 
 - FastAPI for the API and dashboard server
+- React and Vite for the dashboard frontend
+- styled-components for component-scoped styling
 - Postgres for scan history and findings
 - SQLAlchemy for persistence
 - Docker Compose for local app and database startup
@@ -36,6 +38,22 @@ The default Compose configuration starts:
 
 - `andela-app` on port `8000`
 - `andela-postgres` on port `5432`
+
+## Frontend Development
+
+The React dashboard source lives in `frontend/src`. FastAPI serves the compiled Vite output from `app/static/frontend`.
+
+Build the frontend:
+
+```bash
+./scripts/build-frontend.sh
+```
+
+Run the Vite dev server while the FastAPI app is running:
+
+```bash
+npm --prefix frontend run dev
+```
 
 ## Run A Sample Scan
 
@@ -76,8 +94,9 @@ The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-sty
 - `terraform_only`: Terraform contains risky patterns; JSON is clean.
 - `json_only`: JSON contains risky patterns; Terraform is clean.
 - `clean`: Terraform and JSON files are both configured safely.
+- `large_violations`: Terraform and JSON contain a large synthetic finding set for search, filtering, and pagination testing.
 
-The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM policies, and disabled database encryption.
+The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM policies, disabled database encryption, and suspended S3 versioning.
 
 ## Run Tests
 
@@ -95,7 +114,7 @@ Use the scripts directory to run the test scopes:
 ./scripts/test-all.sh
 ```
 
-The test suite includes scanner unit tests for each fixture scenario and FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard rendering, rules metadata, missing paths, and scan-root path safety.
+The functional and full test scripts build the React frontend before running FastAPI tests. The test suite includes scanner unit tests for each fixture scenario and FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard serving, rules metadata, missing paths, and scan-root path safety.
 
 ## Challenge Submission Notes
 

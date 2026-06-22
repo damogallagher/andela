@@ -97,6 +97,7 @@ def _scan_file(file_path: str, content: str) -> list[FindingCandidate]:
         _open_ssh_ingress,
         _wildcard_iam_policy,
         _unencrypted_database,
+        _s3_versioning_disabled,
     ]
     findings: list[FindingCandidate] = []
     for check in checks:
@@ -127,6 +128,7 @@ def _scan_json_file(file_path: str, content: str) -> Optional[list[FindingCandid
         findings.extend(_json_open_ssh_ingress(file_path, content, resource_name, resource_type, properties))
         findings.extend(_json_unencrypted_database(file_path, content, resource_name, resource_type, properties))
         findings.extend(_json_wildcard_iam_policy(file_path, content, resource_name, resource_type, properties))
+        findings.extend(_json_s3_versioning_disabled(file_path, content, resource_name, resource_type, properties))
 
     return findings
 
@@ -234,6 +236,33 @@ def _json_wildcard_iam_policy(
             resource=f"{resource_type}.{resource_name}",
             evidence='"Action" and "Resource" both include "*"',
             recommendation="Replace wildcard actions and resources with least-privilege permissions.",
+        )
+    ]
+
+
+def _json_s3_versioning_disabled(
+    file_path: str,
+    content: str,
+    resource_name: str,
+    resource_type: str,
+    properties: dict,
+) -> list[FindingCandidate]:
+    versioning = properties.get("VersioningConfiguration", {})
+    if not isinstance(versioning, dict):
+        return []
+    status = str(versioning.get("Status", ""))
+    if resource_type != "AWS::S3::Bucket" or status not in {"Disabled", "Suspended"}:
+        return []
+    return [
+        FindingCandidate(
+            rule_id="S3_VERSIONING_DISABLED",
+            title="S3 versioning disabled",
+            severity="low",
+            file_path=file_path,
+            line_number=_json_key_line(content, "VersioningConfiguration"),
+            resource=f"{resource_type}.{resource_name}",
+            evidence=f'"VersioningConfiguration": "{status}"',
+            recommendation="Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion.",
         )
     ]
 
@@ -348,6 +377,33 @@ def _unencrypted_database(file_path: str, content: str) -> list[FindingCandidate
                     resource=_nearest_resource(content, match.start()),
                     evidence=_line_at(content, match.start()),
                     recommendation="Enable storage encryption for database resources before deployment.",
+                )
+            )
+    return findings
+
+
+def _s3_versioning_disabled(file_path: str, content: str) -> list[FindingCandidate]:
+    findings: list[FindingCandidate] = []
+    checks = [
+        re.finditer(r"versioning\s*\{(?P<body>.*?)\}", content, re.DOTALL),
+        re.finditer(r"resource\s+\"aws_s3_bucket_versioning\"[^{}]+\{(?P<body>.*?)\n\}", content, re.DOTALL),
+    ]
+    for matches in checks:
+        for match in matches:
+            body = match.group("body")
+            disabled = re.search(r"enabled\s*=\s*false|status\s*=\s*\"Suspended\"", body)
+            if not disabled:
+                continue
+            findings.append(
+                FindingCandidate(
+                    rule_id="S3_VERSIONING_DISABLED",
+                    title="S3 versioning disabled",
+                    severity="low",
+                    file_path=file_path,
+                    line_number=_line_number(content, match.start()),
+                    resource=_nearest_resource(content, match.start() + disabled.start()),
+                    evidence=_compact(body),
+                    recommendation="Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion.",
                 )
             )
     return findings
