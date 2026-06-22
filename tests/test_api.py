@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from app.database import Base, engine
 from app.main import app
+from app.scanner import RULES, RULES_BY_ID
 
 
 @pytest.fixture()
@@ -74,6 +75,9 @@ def test_scan_sarif_endpoint_exports_code_scanning_results(client: TestClient) -
         "IAM_WILDCARD_POLICY",
         "OPEN_SSH_INGRESS",
     }
+    open_ssh_rule = next(rule for rule in run["tool"]["driver"]["rules"] if rule["id"] == "OPEN_SSH_INGRESS")
+    assert open_ssh_rule["fullDescription"]["text"] == RULES_BY_ID["OPEN_SSH_INGRESS"].description
+    assert open_ssh_rule["help"]["text"] == RULES_BY_ID["OPEN_SSH_INGRESS"].recommendation
     assert run["invocations"][0]["executionSuccessful"] is True
     assert run["invocations"][0]["properties"]["scanId"] == scan["id"]
 
@@ -169,14 +173,16 @@ def test_rules_endpoint_lists_supported_rules(client: TestClient) -> None:
     response = client.get("/api/rules")
 
     assert response.status_code == 200
-    rule_ids = {rule["rule_id"] for rule in response.json()}
-    assert {
-        "OPEN_SSH_INGRESS",
-        "S3_PUBLIC_ACL",
-        "IAM_WILDCARD_POLICY",
-        "DATABASE_ENCRYPTION_DISABLED",
-        "S3_VERSIONING_DISABLED",
-    }.issubset(rule_ids)
+    assert response.json() == [
+        {
+            "rule_id": rule.rule_id,
+            "title": rule.title,
+            "severity": rule.severity,
+            "description": rule.description,
+            "recommendation": rule.recommendation,
+        }
+        for rule in RULES
+    ]
 
 
 def test_scan_rejects_paths_outside_scan_root(client: TestClient) -> None:

@@ -311,3 +311,11 @@ Architecture Decision Records + a diagram. SAs are judged on documented judgment
 ```
 
 Agent action: Added architecture decision records for local-only delivery, Postgres over SQLite, focused scanner patterns over a full HCL parser, and API/CLI/SARIF interfaces; added a README component diagram and linked the ADRs from the challenge submission notes.
+
+## 2026-06-23 00:38 IST - Prompt 037 - Rule Registry Refactor
+
+```text
+Rule metadata is duplicated: hardcoded check functions in scanner.py and a hand-written list in main.py's /api/rules endpoint. These will drift. Extract a rule registry (id, title, severity, recommendation, check fn) that both the scanner and /api/rules read from.
+```
+
+Agent action: Extracted rule metadata and check functions into `app.scanner.RULES`, updated scanner findings, `/api/rules`, and SARIF rule metadata to read from the registry, and added tests to prevent metadata drift.

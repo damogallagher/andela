@@ -11,7 +11,15 @@ from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import Finding, ScanRun
 from app.sarif import build_sarif
-from app.scanner import SUPPORTED_EXTENSIONS, ScanInputFile, ScanResult, scan_files, scan_path, severity_rank
+from app.scanner import (
+    RULES,
+    SUPPORTED_EXTENSIONS,
+    ScanInputFile,
+    ScanResult,
+    scan_files,
+    scan_path,
+    severity_rank,
+)
 from app.schemas import ScanRequest, ScanResponse
 
 
@@ -123,30 +131,13 @@ def get_scan_sarif(scan_id: int, db: Session = Depends(get_db)) -> JSONResponse:
 def rules() -> list[dict[str, str]]:
     return [
         {
-            "rule_id": "OPEN_SSH_INGRESS",
-            "severity": "critical",
-            "description": "Detects security group ingress that exposes SSH to 0.0.0.0/0 or ::/0.",
-        },
-        {
-            "rule_id": "S3_PUBLIC_ACL",
-            "severity": "high",
-            "description": "Detects S3 ACL settings that make buckets publicly readable or writable.",
-        },
-        {
-            "rule_id": "IAM_WILDCARD_POLICY",
-            "severity": "high",
-            "description": "Detects wildcard IAM action and resource policies.",
-        },
-        {
-            "rule_id": "DATABASE_ENCRYPTION_DISABLED",
-            "severity": "medium",
-            "description": "Detects database resources with storage encryption disabled.",
-        },
-        {
-            "rule_id": "S3_VERSIONING_DISABLED",
-            "severity": "low",
-            "description": "Detects S3 buckets with versioning explicitly disabled or suspended.",
-        },
+            "rule_id": rule.rule_id,
+            "title": rule.title,
+            "severity": rule.severity,
+            "description": rule.description,
+            "recommendation": rule.recommendation,
+        }
+        for rule in RULES
     ]
 
 

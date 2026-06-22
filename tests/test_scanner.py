@@ -1,7 +1,7 @@
 from collections import Counter
 from pathlib import Path
 
-from app.scanner import ScanInputFile, calculate_risk_score, scan_files, scan_path
+from app.scanner import RULES, RULES_BY_ID, ScanInputFile, calculate_risk_score, scan_files, scan_path
 
 SCENARIOS = Path("sample_iac/scenarios")
 
@@ -9,6 +9,19 @@ SCENARIOS = Path("sample_iac/scenarios")
 def rule_counts(path: Path) -> Counter:
     result = scan_path(path)
     return Counter(finding.rule_id for finding in result.findings)
+
+
+def test_rule_registry_contains_metadata_and_check_functions() -> None:
+    assert [rule.rule_id for rule in RULES] == [
+        "OPEN_SSH_INGRESS",
+        "S3_PUBLIC_ACL",
+        "IAM_WILDCARD_POLICY",
+        "DATABASE_ENCRYPTION_DISABLED",
+        "S3_VERSIONING_DISABLED",
+    ]
+    assert set(RULES_BY_ID) == {rule.rule_id for rule in RULES}
+    assert all(rule.title and rule.severity and rule.description and rule.recommendation for rule in RULES)
+    assert all(callable(rule.check) for rule in RULES)
 
 
 def test_both_risky_scenario_detects_terraform_and_json_findings() -> None:
@@ -51,6 +64,11 @@ def test_json_only_scenario_detects_only_json_findings() -> None:
         }
     )
     assert {finding.file_path for finding in result.findings} == {"risky_cloudformation.json"}
+    for finding in result.findings:
+        rule = RULES_BY_ID[finding.rule_id]
+        assert finding.title == rule.title
+        assert finding.severity == rule.severity
+        assert finding.recommendation == rule.recommendation
     assert result.risk_score == 50
 
 

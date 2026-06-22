@@ -6,6 +6,7 @@ from typing import Any
 
 from app.config import settings
 from app.models import Finding, ScanRun
+from app.scanner import RULES_BY_ID
 
 SARIF_SCHEMA_URI = "https://json.schemastore.org/sarif-2.1.0.json"
 SARIF_VERSION = "2.1.0"
@@ -25,14 +26,6 @@ SECURITY_SEVERITIES = {
     "high": "8.0",
     "medium": "5.5",
     "low": "2.5",
-}
-
-RULE_DESCRIPTIONS = {
-    "OPEN_SSH_INGRESS": "Detects security group ingress that exposes SSH to the public internet.",
-    "S3_PUBLIC_ACL": "Detects S3 bucket ACL settings that allow public read or write access.",
-    "IAM_WILDCARD_POLICY": "Detects IAM policies that grant wildcard actions and wildcard resources.",
-    "DATABASE_ENCRYPTION_DISABLED": "Detects database resources where storage encryption is disabled.",
-    "S3_VERSIONING_DISABLED": "Detects S3 buckets where versioning is disabled or suspended.",
 }
 
 
@@ -78,15 +71,19 @@ def _rules(findings: list[Finding]) -> list[dict[str, Any]]:
 
 
 def _rule(finding: Finding) -> dict[str, Any]:
-    severity = finding.severity.lower()
+    registry_rule = RULES_BY_ID.get(finding.rule_id)
+    title = registry_rule.title if registry_rule else finding.title
+    severity = registry_rule.severity if registry_rule else finding.severity.lower()
+    description = registry_rule.description if registry_rule else finding.title
+    recommendation = registry_rule.recommendation if registry_rule else finding.recommendation
     return {
         "id": finding.rule_id,
-        "name": finding.title,
-        "shortDescription": {"text": finding.title},
-        "fullDescription": {"text": RULE_DESCRIPTIONS.get(finding.rule_id, finding.title)},
+        "name": title,
+        "shortDescription": {"text": title},
+        "fullDescription": {"text": description},
         "help": {
-            "text": finding.recommendation,
-            "markdown": finding.recommendation,
+            "text": recommendation,
+            "markdown": recommendation,
         },
         "properties": {
             "problem.severity": severity,

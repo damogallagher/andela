@@ -162,6 +162,8 @@ The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-sty
 
 The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM policies, disabled database encryption, and suspended S3 versioning.
 
+Rule metadata and rule check functions are registered once in `app.scanner.RULES`. Scanner findings, `/api/rules`, and SARIF rule metadata all read from that registry to avoid drift.
+
 ## Run Tests
 
 ```bash
