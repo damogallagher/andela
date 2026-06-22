@@ -10,6 +10,8 @@ This repository is for the Andela New Hire Challenge.
 - Maintain `prompts.md` after every user instruction or implementation turn.
 - `prompts.md` must record the prompt/instruction used, the date, and the agent action taken.
 - Keep `README.md` up to date whenever setup, run, test, architecture, or submission details change.
+- For any functionality touched, update the relevant unit or functional tests and the Playwright frontend tests before handoff.
+- Always run the complete test suite before handoff and report any command that could not run.
 
 ## Technical Direction
 
@@ -25,4 +27,3 @@ This repository is for the Andela New Hire Challenge.
 - Do not execute remediation commands against real cloud accounts.
 - Sample infrastructure files are safe local fixtures for scanner demonstration.
 - Any new scanner rule must include a clear recommendation and a deterministic test where practical.
-
