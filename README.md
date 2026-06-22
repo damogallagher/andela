@@ -119,10 +119,13 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-Use the scripts directory to run the test scopes:
+Use the scripts directory to run linting and test scopes:
 
 ```bash
+./scripts/lint-project.sh
 ./scripts/lint-all.sh
+./scripts/lint-backend.sh
+./scripts/lint-frontend.sh
 ./scripts/test-unit.sh
 ./scripts/test-functional.sh
 ./scripts/test-playwright.sh

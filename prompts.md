@@ -224,3 +224,11 @@ If score is above 90, show the final score in greeen, come up with different thr
 ```
 
 Agent action: Updated the React score panel to display the score as a percentage, color it green above 90, amber from 70 to 90, and red below 70, and added Playwright coverage for the threshold boundaries.
+
+## 2026-06-23 00:08 IST - Prompt 027 - Project Lint Scripts
+
+```text
+create scripts in the scripts dir to run linting on the project
+```
+
+Agent action: Added a project-level lint wrapper script in `scripts/lint-project.sh`, kept the backend/frontend lint scripts as the scoped lint entry points, and documented the lint commands in README.
