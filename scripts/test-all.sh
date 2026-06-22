@@ -14,3 +14,4 @@ else
 fi
 
 "${PYTHON}" -m pytest "$@"
+"${REPO_ROOT}/scripts/test-playwright.sh"

@@ -13,6 +13,7 @@ This project is intentionally local-only. It does not create AWS, Azure, or othe
 - SQLAlchemy for persistence
 - Docker Compose for local app and database startup
 - Pytest for scanner tests
+- Playwright for frontend browser tests
 
 ## Coding Agent And Model
 
@@ -111,10 +112,13 @@ Use the scripts directory to run the test scopes:
 ```bash
 ./scripts/test-unit.sh
 ./scripts/test-functional.sh
+./scripts/test-playwright.sh
 ./scripts/test-all.sh
 ```
 
-The functional and full test scripts build the React frontend before running FastAPI tests. The test suite includes scanner unit tests for each fixture scenario and FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard serving, rules metadata, missing paths, and scan-root path safety.
+The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner unit tests for each fixture scenario, FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, severity filtering, breadcrumbs, search, pagination, uploads, scan history, and mobile-width usability.
+
+The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
 
 ## Challenge Submission Notes
 

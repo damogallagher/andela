@@ -14,3 +14,5 @@ build/
 postgres-data/
 frontend/node_modules/
 app/static/frontend/
+frontend/playwright-report/
+frontend/test-results/

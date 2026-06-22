@@ -121,12 +121,34 @@ Update the UI to use color coding for the issue severity. Also allow a user to c
 
 Agent action: Added color-coded clickable severity cards, active filter breadcrumbs, a clear severity action, client-side search, and findings pagination.
 
-## 2026-06-22 23:24 IST - Prompt 014 - Synthetic Large Fixtures And React Frontend
+## 2026-06-22 23:24 IST - Prompt 014 - Synthetic Large Fixtures
 
 ```text
 Generate synthetic terraform files and json fiels for the tests but include a LARGE number of violations for each category. This will be useful when testing searching and pagination.
+```
 
+Agent action: Added large synthetic Terraform and JSON fixtures and introduced a low-severity S3 versioning rule to exercise all severity categories during search and pagination testing.
+
+## 2026-06-22 23:24 IST - Prompt 015 - React Frontend Conversion
+
+```text
 In the app folder we have a very simple css and html file, is it possible to convert this to a react application with individual styled components? This would make the application easier to extend in the future
 ```
 
-Agent action: Added large synthetic Terraform and JSON fixtures, introduced a low-severity S3 versioning rule, converted the dashboard to a Vite React app using styled-components, and updated build/test documentation.
+Agent action: Converted the dashboard from a simple HTML/CSS template into a Vite React application with individual styled-components, updated FastAPI to serve the compiled frontend bundle, and updated build/test documentation.
+
+## 2026-06-22 23:34 IST - Prompt 016 - Playwright Frontend Coverage And Test Policy
+
+```text
+Updte the code to have fully functional playwright tests to ALL of the frontend code. Update AGENTS.md, for any functionality that is touched, the unit tests and playwright tests are fully updated. Always make sure that all tests are running
+```
+
+Agent action: Added Playwright browser tests for the React dashboard, added a Playwright test script, wired Playwright into the full test runner, and updated AGENTS.md with the test-update and full-suite verification rule.
+
+## 2026-06-22 23:35 IST - Prompt 017 - React Prompt Log Correction
+
+```text
+the react upgrade is not listed in prompts.md
+```
+
+Agent action: Split the previous combined prompt-log entry so the React frontend conversion is listed explicitly as its own prompt.

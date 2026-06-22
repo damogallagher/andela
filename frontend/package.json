@@ -6,14 +6,17 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.0.2",
-    "vite": "8.0.16",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "styled-components": "6.4.2"
+    "styled-components": "6.4.2",
+    "vite": "8.0.16"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@playwright/test": "1.61.0"
+  }
 }
