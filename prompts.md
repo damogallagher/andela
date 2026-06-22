@@ -184,3 +184,19 @@ app/static/frontend still exists - is this folder still being used now that we h
 ```
 
 Agent action: Clarified that `app/static/frontend` is generated React build output served by FastAPI, while source code lives in `frontend/src`; the generated output remains ignored by Git.
+
+## 2026-06-22 23:52 IST - Prompt 022 - Clickable Recent Scans
+
+```text
+allow user to click recent scans to see those results. Also incldue the date and time the scan was conducted
+```
+
+Agent action: Made recent scans selectable, displayed each scan timestamp in the audit trail, and updated Playwright coverage for switching the dashboard to a selected historical scan.
+
+## 2026-06-22 23:53 IST - Prompt 023 - Wider Dashboard Layout
+
+```text
+the page is very squased, update it to use more screen real estate
+```
+
+Agent action: Widened the dashboard content area, expanded findings to a full-width row, and changed recent scans into a wider responsive audit-trail band to reduce table crowding.

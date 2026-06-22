@@ -24,12 +24,13 @@ function insertLatestScan(scans, scan) {
 
 export function App() {
   const [scans, setScans] = useState([]);
+  const [selectedScanId, setSelectedScanId] = useState(null);
   const [selectedSeverity, setSelectedSeverity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sampleBusy, setSampleBusy] = useState(false);
   const [error, setError] = useState("");
-  const latestScan = scans[0] || null;
-  const counts = useMemo(() => severityCounts(latestScan), [latestScan]);
+  const selectedScan = scans.find((scan) => scan.id === selectedScanId) || scans[0] || null;
+  const counts = useMemo(() => severityCounts(selectedScan), [selectedScan]);
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +61,7 @@ export function App() {
     try {
       const scan = await runSampleScan();
       setScans((current) => insertLatestScan(current, scan));
+      setSelectedScanId(scan.id);
       setSelectedSeverity(null);
     } catch (requestError) {
       setError(requestError.message);
@@ -70,6 +72,12 @@ export function App() {
 
   function handleScanCreated(scan) {
     setScans((current) => insertLatestScan(current, scan));
+    setSelectedScanId(scan.id);
+    setSelectedSeverity(null);
+  }
+
+  function handleSelectScan(scanId) {
+    setSelectedScanId(scanId);
     setSelectedSeverity(null);
   }
 
@@ -80,11 +88,16 @@ export function App() {
         <Layout>
           {error ? <ErrorBanner role="alert">{error}</ErrorBanner> : null}
           {loading ? <LoadingBanner>Loading scans...</LoadingBanner> : null}
-          <RiskScorePanel scan={latestScan} />
+          <RiskScorePanel scan={selectedScan} />
           <SeverityCards counts={counts} selectedSeverity={selectedSeverity} onSelect={setSelectedSeverity} />
           <UploadScan onScanCreated={handleScanCreated} />
-          <FindingsTable scan={latestScan} selectedSeverity={selectedSeverity} onClearSeverity={() => setSelectedSeverity(null)} />
-          <ScanHistory scans={scans} />
+          <FindingsTable
+            key={selectedScan?.id || "empty"}
+            scan={selectedScan}
+            selectedSeverity={selectedSeverity}
+            onClearSeverity={() => setSelectedSeverity(null)}
+          />
+          <ScanHistory scans={scans} selectedScanId={selectedScan?.id || null} onSelectScan={handleSelectScan} />
         </Layout>
       </Shell>
     </ThemeProvider>

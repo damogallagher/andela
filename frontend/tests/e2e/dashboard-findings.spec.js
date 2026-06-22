@@ -7,6 +7,7 @@ import {
   mockScanHistory,
   sampleScan,
   trackFrontendErrors,
+  uploadedScan,
 } from "./fixtures/scans.js";
 
 test.describe("dashboard sample scan, filters, search, pagination, and history", () => {
@@ -36,6 +37,43 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await expect(page.locator("tbody tr")).toHaveCount(5);
     await expect(page.getByRole("heading", { name: "Recent Scans" })).toBeVisible();
     await expect(page.getByText("Sample local IaC scan")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sample local IaC scan\s+0\s+2026-06-22 22:35/ })).toBeVisible();
+    expectNoFrontendErrors(frontendErrors);
+  });
+
+  test("selects a recent scan and shows that scan's results", async ({ page }) => {
+    const frontendErrors = trackFrontendErrors(page);
+    const currentScan = sampleScan({
+      id: 301,
+      label: "Current sample scan",
+      created_at: "2026-06-22T22:35:00",
+    });
+    const previousScan = uploadedScan({
+      id: 302,
+      label: "Uploaded smoke scan",
+      created_at: "2026-06-22T21:15:00",
+    });
+    await mockScanHistory(page, [currentScan, previousScan]);
+
+    await page.goto("/");
+
+    await expect(page.getByText("55 findings across 10 files")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Current sample scan\s+0\s+2026-06-22 22:35/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    const previousButton = page.getByRole("button", { name: /Uploaded smoke scan\s+90\s+2026-06-22 21:15/ });
+    await previousButton.click();
+
+    await expect(previousButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("1 findings across 1 files")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Critical\s+0/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Medium\s+1/ })).toBeVisible();
+    await expect(page.getByText("1 matching finding")).toBeVisible();
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator("tbody tr").first()).toContainText("uploaded-risky.tf");
+    await expect(page.locator('section[aria-labelledby="findings-title"]')).toContainText("2026-06-22 21:15");
     expectNoFrontendErrors(frontendErrors);
   });
 

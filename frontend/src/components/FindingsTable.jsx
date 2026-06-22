@@ -3,15 +3,12 @@ import styled from "styled-components";
 
 import { SubtleButton } from "./Button.jsx";
 import { EmptyText, Eyebrow, Panel, SectionHeader, SectionTitle } from "./Panel.jsx";
+import { formatScanDateTime } from "../time.js";
 import { severityTheme, theme } from "../styles.js";
 
 const FindingsPanel = styled(Panel)`
-  grid-column: span 9;
+  grid-column: 1 / -1;
   padding: 24px;
-
-  @media (max-width: 920px) {
-    grid-column: 1 / -1;
-  }
 `;
 
 const Timestamp = styled.span`
@@ -171,11 +168,6 @@ const PageSummary = styled.span`
   text-align: center;
 `;
 
-function formatTimestamp(value) {
-  if (!value) return "";
-  return value.replace("T", " ").slice(0, 19);
-}
-
 function labelForSeverity(severity) {
   return severity.charAt(0).toUpperCase() + severity.slice(1);
 }
@@ -242,7 +234,7 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
           <Eyebrow>Latest scan</Eyebrow>
           <SectionTitle id="findings-title">Findings</SectionTitle>
         </div>
-        <Timestamp>{formatTimestamp(scan.created_at)}</Timestamp>
+        <Timestamp>{formatScanDateTime(scan.created_at)}</Timestamp>
       </SectionHeader>
 
       {findings.length > 0 ? (

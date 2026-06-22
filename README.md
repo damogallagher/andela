@@ -35,7 +35,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
-The dashboard supports severity color coding, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, and paginated result rows.
+The dashboard supports severity color coding, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, paginated result rows, and clickable recent scan history with scan timestamps.
 
 The default Compose configuration starts:
 
