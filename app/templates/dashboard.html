@@ -36,23 +36,23 @@
         </div>
       </section>
 
-      <section class="metrics" aria-label="Finding counts">
-        <article>
+      <section class="metrics" aria-label="Finding counts by severity">
+        <button class="severity-card severity-critical" type="button" data-severity-filter="critical" aria-pressed="false">
           <span>Critical</span>
           <strong>{{ severity_counts.critical }}</strong>
-        </article>
-        <article>
+        </button>
+        <button class="severity-card severity-high" type="button" data-severity-filter="high" aria-pressed="false">
           <span>High</span>
           <strong>{{ severity_counts.high }}</strong>
-        </article>
-        <article>
+        </button>
+        <button class="severity-card severity-medium" type="button" data-severity-filter="medium" aria-pressed="false">
           <span>Medium</span>
           <strong>{{ severity_counts.medium }}</strong>
-        </article>
-        <article>
+        </button>
+        <button class="severity-card severity-low" type="button" data-severity-filter="low" aria-pressed="false">
           <span>Low</span>
           <strong>{{ severity_counts.low }}</strong>
-        </article>
+        </button>
       </section>
 
       <section class="upload-panel" aria-labelledby="upload-title">
@@ -95,6 +95,28 @@
         </div>
 
         {% if latest_scan and latest_scan.findings %}
+          <div class="filter-toolbar" aria-label="Finding filters">
+            <div class="filter-state">
+              <span class="breadcrumb-label">Showing</span>
+              <ol class="breadcrumbs" aria-label="Current finding filter">
+                <li>All severities</li>
+                <li id="severity-crumb" hidden></li>
+              </ol>
+              <button id="clear-severity" class="clear-filter" type="button" hidden>Clear</button>
+            </div>
+            <label class="search-control">
+              <span>Search findings</span>
+              <input id="finding-search" type="search" placeholder="Search rule, resource, file, or recommendation">
+            </label>
+            <label class="page-size-control">
+              <span>Rows</span>
+              <select id="page-size">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="25">25</option>
+              </select>
+            </label>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -108,7 +130,11 @@
               </thead>
               <tbody>
                 {% for finding in latest_scan.findings %}
-                  <tr>
+                  <tr
+                    data-finding-row
+                    data-severity="{{ finding.severity }}"
+                    data-search="{{ (finding.severity ~ ' ' ~ finding.title ~ ' ' ~ finding.resource ~ ' ' ~ finding.file_path ~ ' ' ~ finding.recommendation ~ ' ' ~ finding.evidence)|lower|e }}"
+                  >
                     <td><span class="badge {{ finding.severity }}">{{ finding.severity }}</span></td>
                     <td>{{ finding.title }}</td>
                     <td>{{ finding.resource }}</td>
@@ -119,6 +145,15 @@
               </tbody>
             </table>
           </div>
+          <div class="table-footer">
+            <p id="result-summary" class="result-summary"></p>
+            <nav class="pagination" aria-label="Findings pagination">
+              <button id="previous-page" type="button">Previous</button>
+              <span id="page-summary"></span>
+              <button id="next-page" type="button">Next</button>
+            </nav>
+          </div>
+          <p id="no-results" class="empty" hidden>No findings match the current filters.</p>
         {% else %}
           <p class="empty">No findings available yet.</p>
         {% endif %}
@@ -159,6 +194,126 @@
         }
         window.location.reload();
       });
+
+      const findingRows = Array.from(document.querySelectorAll("[data-finding-row]"));
+      const severityCards = Array.from(document.querySelectorAll("[data-severity-filter]"));
+      const clearSeverityButton = document.querySelector("#clear-severity");
+      const severityCrumb = document.querySelector("#severity-crumb");
+      const searchInput = document.querySelector("#finding-search");
+      const pageSizeSelect = document.querySelector("#page-size");
+      const previousPageButton = document.querySelector("#previous-page");
+      const nextPageButton = document.querySelector("#next-page");
+      const pageSummary = document.querySelector("#page-summary");
+      const resultSummary = document.querySelector("#result-summary");
+      const noResults = document.querySelector("#no-results");
+      const tableFooter = document.querySelector(".table-footer");
+
+      const findingState = {
+        severity: null,
+        query: "",
+        page: 1,
+        pageSize: 5,
+      };
+
+      function labelForSeverity(severity) {
+        return severity.charAt(0).toUpperCase() + severity.slice(1);
+      }
+
+      function filteredRows() {
+        return findingRows.filter((row) => {
+          const matchesSeverity = !findingState.severity || row.dataset.severity === findingState.severity;
+          const matchesQuery = !findingState.query || row.dataset.search.includes(findingState.query);
+          return matchesSeverity && matchesQuery;
+        });
+      }
+
+      function renderFindingTable() {
+        if (!findingRows.length) {
+          return;
+        }
+        const rows = filteredRows();
+        const pageCount = Math.max(1, Math.ceil(rows.length / findingState.pageSize));
+        findingState.page = Math.min(findingState.page, pageCount);
+        const start = (findingState.page - 1) * findingState.pageSize;
+        const visibleRows = new Set(rows.slice(start, start + findingState.pageSize));
+
+        findingRows.forEach((row) => {
+          row.hidden = !visibleRows.has(row);
+        });
+
+        severityCards.forEach((card) => {
+          const selected = card.dataset.severityFilter === findingState.severity;
+          card.classList.toggle("is-active", selected);
+          card.setAttribute("aria-pressed", String(selected));
+        });
+
+        if (findingState.severity) {
+          severityCrumb.hidden = false;
+          severityCrumb.textContent = labelForSeverity(findingState.severity);
+          clearSeverityButton.hidden = false;
+        } else {
+          severityCrumb.hidden = true;
+          severityCrumb.textContent = "";
+          clearSeverityButton.hidden = true;
+        }
+
+        const totalLabel = rows.length === 1 ? "matching finding" : "matching findings";
+        resultSummary.textContent = `${rows.length} ${totalLabel}`;
+        pageSummary.textContent = `Page ${findingState.page} of ${pageCount}`;
+        previousPageButton.disabled = findingState.page <= 1;
+        nextPageButton.disabled = findingState.page >= pageCount;
+        tableFooter.hidden = rows.length === 0;
+        noResults.hidden = rows.length !== 0;
+      }
+
+      severityCards.forEach((card) => {
+        card.addEventListener("click", () => {
+          const selectedSeverity = card.dataset.severityFilter;
+          findingState.severity = findingState.severity === selectedSeverity ? null : selectedSeverity;
+          findingState.page = 1;
+          renderFindingTable();
+        });
+      });
+
+      if (clearSeverityButton) {
+        clearSeverityButton.addEventListener("click", () => {
+          findingState.severity = null;
+          findingState.page = 1;
+          renderFindingTable();
+        });
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener("input", () => {
+          findingState.query = searchInput.value.trim().toLowerCase();
+          findingState.page = 1;
+          renderFindingTable();
+        });
+      }
+
+      if (pageSizeSelect) {
+        pageSizeSelect.addEventListener("change", () => {
+          findingState.pageSize = Number(pageSizeSelect.value);
+          findingState.page = 1;
+          renderFindingTable();
+        });
+      }
+
+      if (previousPageButton) {
+        previousPageButton.addEventListener("click", () => {
+          findingState.page = Math.max(1, findingState.page - 1);
+          renderFindingTable();
+        });
+      }
+
+      if (nextPageButton) {
+        nextPageButton.addEventListener("click", () => {
+          findingState.page += 1;
+          renderFindingTable();
+        });
+      }
+
+      renderFindingTable();
 
       const uploadForm = document.querySelector("#upload-form");
       const uploadButton = document.querySelector("#upload-submit");

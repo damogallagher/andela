@@ -30,6 +30,8 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
+The dashboard supports severity color coding, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, and paginated result rows.
+
 The default Compose configuration starts:
 
 - `andela-app` on port `8000`

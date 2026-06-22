@@ -56,7 +56,7 @@ def test_sample_scan_endpoint_scans_all_sample_scenarios(client: TestClient) -> 
 def test_dashboard_renders_latest_scan(client: TestClient) -> None:
     client.post(
         "/api/scans",
-        json={"path": "sample_iac/scenarios/clean", "label": "Clean fixture scan"},
+        json={"path": "sample_iac/scenarios/json_only", "label": "JSON-only fixture scan"},
     )
 
     response = client.get("/")
@@ -64,9 +64,13 @@ def test_dashboard_renders_latest_scan(client: TestClient) -> None:
     assert response.status_code == 200
     assert "Enterprise Security Guardrail Auditor" in response.text
     assert "Scan Files" in response.text
+    assert "data-severity-filter=\"critical\"" in response.text
+    assert "Search findings" in response.text
+    assert "Findings pagination" in response.text
+    assert "Clear" in response.text
     assert "/api/scans/upload" in response.text
-    assert "Clean fixture scan" in response.text
-    assert "100" in response.text
+    assert "JSON-only fixture scan" in response.text
+    assert "50" in response.text
 
 
 def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestClient) -> None:

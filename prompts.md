@@ -112,3 +112,11 @@ Expand the api and frontend, allow the user to upload a file / files and then sc
 ```
 
 Agent action: Added upload scanning support for one or more infrastructure files, expanded the dashboard with upload controls, and documented the upload API workflow.
+
+## 2026-06-22 23:09 IST - Prompt 013 - Severity Filtering And Findings Table Controls
+
+```text
+Update the UI to use color coding for the issue severity. Also allow a user to click on a severity box and only show those issues. If there are alot of issues, also have pagination, searchign and filtering on the table of results. If a box is selected, have breadcrumbs to show if critical / low / medium is selected and a clear button to re show ALL severity isues
+```
+
+Agent action: Added color-coded clickable severity cards, active filter breadcrumbs, a clear severity action, client-side search, and findings pagination.
