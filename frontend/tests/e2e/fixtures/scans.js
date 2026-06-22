@@ -62,6 +62,20 @@ function makeFindings() {
       id += 1;
     }
   }
+  for (let index = 1; index <= 12; index += 1) {
+    findings.push(
+      makeFinding(id, "critical", index, {
+        rule_id: "HARDCODED_SECRET",
+        title: "Hardcoded credential detected",
+        resource: `Custom::SecretConfig.SyntheticSecretConfig${String(index).padStart(2, "0")}`,
+        file_path: "sample_iac/scenarios/large_violations/synthetic_large_violations.json",
+        recommendation:
+          "Remove the hardcoded credential, rotate the exposed value, and load it from a secrets manager or CI secret.",
+        evidence: "AdminPassword = <redacted>",
+      }),
+    );
+    id += 1;
+  }
   return findings;
 }
 
@@ -71,7 +85,7 @@ export function sampleScan(overrides = {}) {
     id: 101,
     label: "Sample local IaC scan",
     target_path: "/workspace/sample_iac",
-    risk_score: 0,
+    risk_score: 47,
     files_scanned: 10,
     findings_count: findings.length,
     created_at: createdAt,

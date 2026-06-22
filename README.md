@@ -165,9 +165,10 @@ The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-sty
 - `clean`: Terraform and JSON files are both configured safely.
 - `large_violations`: Terraform and JSON contain a large synthetic finding set for search, filtering, and pagination testing.
 
-The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM policies, disabled database encryption, and suspended S3 versioning.
+The sample findings cover public SSH ingress, hardcoded credentials, AWS access key patterns, public S3 ACLs, wildcard IAM policies, disabled database encryption, and suspended S3 versioning.
 
 Rule metadata and rule check functions are registered once in `app.scanner.RULES`. Scanner findings, `/api/rules`, and SARIF rule metadata all read from that registry to avoid drift.
+Secret findings redact evidence before persistence, dashboard display, CLI output, and SARIF export.
 
 ## Run Tests
 

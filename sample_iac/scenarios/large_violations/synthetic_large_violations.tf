@@ -189,3 +189,39 @@ resource "aws_s3_bucket_versioning" "synthetic_suspended_versioning_06" {
     status = "Suspended"
   }
 }
+
+resource "null_resource" "synthetic_secret_01" {
+  triggers = {
+    admin_password = "example-password-01"
+  }
+}
+
+resource "null_resource" "synthetic_secret_02" {
+  triggers = {
+    api_token = "example-token-02"
+  }
+}
+
+resource "null_resource" "synthetic_secret_03" {
+  triggers = {
+    client_secret = "example-client-secret-03"
+  }
+}
+
+resource "null_resource" "synthetic_secret_04" {
+  triggers = {
+    database_password = "example-password-04"
+  }
+}
+
+resource "null_resource" "synthetic_secret_05" {
+  triggers = {
+    service_api_key = "example-api-key-05"
+  }
+}
+
+resource "null_resource" "synthetic_secret_06" {
+  triggers = {
+    private_key = "example-private-key-06"
+  }
+}

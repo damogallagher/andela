@@ -223,6 +223,42 @@
           "Status": "Suspended"
         }
       }
+    },
+    "SyntheticSecretConfig01": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "AdminPassword": "example-password-07"
+      }
+    },
+    "SyntheticSecretConfig02": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "ApiToken": "example-token-08"
+      }
+    },
+    "SyntheticSecretConfig03": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "ClientSecret": "example-client-secret-09"
+      }
+    },
+    "SyntheticSecretConfig04": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "DatabasePassword": "example-password-10"
+      }
+    },
+    "SyntheticSecretConfig05": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "ServiceApiKey": "example-api-key-11"
+      }
+    },
+    "SyntheticSecretConfig06": {
+      "Type": "Custom::SecretConfig",
+      "Properties": {
+        "PrivateKey": "example-private-key-12"
+      }
     }
   }
 }

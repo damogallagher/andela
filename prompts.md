@@ -335,3 +335,11 @@ Alembic migrations instead of Base.metadata.create_all. Shows you think about sc
 ```
 
 Agent action: Added Alembic configuration and an initial scan-history schema migration, replaced app/test/CI direct metadata table creation with migration execution, added Alembic files to backend lint coverage, and documented the schema migration path in README.
+
+## 2026-06-23 00:49 IST - Prompt 040 - Secrets Detection Rule
+
+```text
+A secrets-detection rule. Hardcoded credentials / AWS access keys are the most common IaC finding and conspicuously missing from your five rules.
+```
+
+Agent action: Added a critical hardcoded-secret scanner rule for AWS access keys and credential assignments, redacted secret evidence, expanded synthetic fixtures and tests, and updated rule catalog documentation.

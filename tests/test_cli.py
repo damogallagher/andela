@@ -28,9 +28,10 @@ def test_cli_scan_fails_when_threshold_is_breached() -> None:
     result = run_cli("scan", "sample_iac", "--fail-on", "critical")
 
     assert result.returncode == 1
-    assert "Findings: 55" in result.stdout
-    assert "FAIL: 14 finding(s) meet or exceed the critical threshold." in result.stdout
+    assert "Findings: 67" in result.stdout
+    assert "FAIL: 26 finding(s) meet or exceed the critical threshold." in result.stdout
     assert "CRITICAL OPEN_SSH_INGRESS" in result.stdout
+    assert "CRITICAL HARDCODED_SECRET" in result.stdout
     assert result.stderr == ""
 
 

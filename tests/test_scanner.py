@@ -35,6 +35,7 @@ def rule_counts(path: Path) -> Counter:
 def test_rule_registry_contains_metadata_and_check_functions() -> None:
     assert [rule.rule_id for rule in RULES] == [
         "OPEN_SSH_INGRESS",
+        "HARDCODED_SECRET",
         "S3_PUBLIC_ACL",
         "IAM_WILDCARD_POLICY",
         "DATABASE_ENCRYPTION_DISABLED",
@@ -107,7 +108,7 @@ def test_large_violations_scenario_exercises_all_severity_categories() -> None:
     assert result.files_scanned == 2
     assert Counter(finding.severity for finding in result.findings) == Counter(
         {
-            "critical": 12,
+            "critical": 24,
             "high": 12,
             "medium": 12,
             "low": 12,
@@ -116,12 +117,13 @@ def test_large_violations_scenario_exercises_all_severity_categories() -> None:
     assert Counter(finding.rule_id for finding in result.findings) == Counter(
         {
             "OPEN_SSH_INGRESS": 12,
+            "HARDCODED_SECRET": 12,
             "S3_PUBLIC_ACL": 12,
             "DATABASE_ENCRYPTION_DISABLED": 12,
             "S3_VERSIONING_DISABLED": 12,
         }
     )
-    assert result.risk_score == 47
+    assert result.risk_score == 42
 
 
 def test_all_sample_iac_scenarios_are_scanned_together() -> None:
@@ -131,13 +133,14 @@ def test_all_sample_iac_scenarios_are_scanned_together() -> None:
     assert Counter(finding.rule_id for finding in result.findings) == Counter(
         {
             "OPEN_SSH_INGRESS": 14,
+            "HARDCODED_SECRET": 12,
             "S3_PUBLIC_ACL": 14,
             "DATABASE_ENCRYPTION_DISABLED": 14,
             "IAM_WILDCARD_POLICY": 1,
             "S3_VERSIONING_DISABLED": 12,
         }
     )
-    assert result.risk_score == 52
+    assert result.risk_score == 47
 
 
 def test_scan_files_supports_uploaded_in_memory_content() -> None:
@@ -164,6 +167,40 @@ resource "aws_security_group" "admin" {
     assert result.files_scanned == 1
     assert result.risk_score == 55
     assert result.findings[0].rule_id == "OPEN_SSH_INGRESS"
+
+
+def test_scan_files_detects_and_redacts_hardcoded_secrets() -> None:
+    aws_access_key = "AKIA" + ("0" * 16)
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="uploaded_secrets.tf",
+                content=f"""
+provider "aws" {{
+  access_key = "{aws_access_key}"
+  secret_key = var.aws_secret_key
+}}
+
+resource "null_resource" "app_config" {{
+  triggers = {{
+    admin_password = "example-password-01"
+    api_token      = "${{var.api_token}}"
+  }}
+}}
+""",
+            )
+        ],
+        "uploaded: uploaded_secrets.tf",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter({"HARDCODED_SECRET": 2})
+    assert all(finding.severity == "critical" for finding in result.findings)
+    assert {finding.evidence for finding in result.findings} == {
+        'access_key = "AKIA****************"',
+        "admin_password = <redacted>",
+    }
+    assert all(aws_access_key not in finding.evidence for finding in result.findings)
+    assert all("example-password-01" not in finding.evidence for finding in result.findings)
 
 
 def test_risk_score_uses_weighted_density_without_zero_saturation() -> None:

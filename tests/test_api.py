@@ -49,8 +49,8 @@ def test_sample_scan_endpoint_scans_all_sample_scenarios(client: TestClient) -> 
     scan = response.json()
     assert scan["label"] == "Sample local IaC scan"
     assert scan["files_scanned"] == 10
-    assert scan["findings_count"] == 55
-    assert scan["risk_score"] == 52
+    assert scan["findings_count"] == 67
+    assert scan["risk_score"] == 47
 
 
 def test_scan_sarif_endpoint_exports_code_scanning_results(client: TestClient) -> None:
@@ -105,10 +105,16 @@ def test_dashboard_renders_latest_scan(client: TestClient) -> None:
 
 
 def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestClient) -> None:
+    aws_access_key = "AKIA" + ("1" * 16)
     terraform_content = (
         'resource "aws_s3_bucket" "reports" {\n'
         '  bucket = "andela-upload-demo"\n'
         '  acl    = "public-read"\n'
+        '}\n'
+        '\nresource "null_resource" "credentials" {\n'
+        '  triggers = {\n'
+        f'    access_key = "{aws_access_key}"\n'
+        '  }\n'
         '}\n'
     )
     json_content = """
@@ -145,12 +151,14 @@ def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestCli
     assert scan["label"] == "Uploaded fixture scan"
     assert scan["target_path"] == "uploaded: uploaded_bucket.tf, uploaded_security.json"
     assert scan["files_scanned"] == 2
-    assert scan["findings_count"] == 2
-    assert scan["risk_score"] == 60
+    assert scan["findings_count"] == 3
+    assert scan["risk_score"] == 52
     assert [finding["rule_id"] for finding in scan["findings"]] == [
+        "HARDCODED_SECRET",
         "OPEN_SSH_INGRESS",
         "S3_PUBLIC_ACL",
     ]
+    assert all(aws_access_key not in finding["evidence"] for finding in scan["findings"])
 
     history_response = client.get("/api/scans")
     assert history_response.status_code == 200

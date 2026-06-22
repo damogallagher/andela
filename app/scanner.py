@@ -8,10 +8,35 @@ from typing import Optional
 SUPPORTED_EXTENSIONS = {".tf", ".json", ".template", ".yaml", ".yml"}
 SSH_RECOMMENDATION = "Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern."
 S3_VERSIONING_RECOMMENDATION = "Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion."
+SECRET_RECOMMENDATION = (
+    "Remove the hardcoded credential, rotate the exposed value, and load it from a secrets manager or CI secret."
+)
 SEVERITY_WEIGHTS = {"critical": 10, "high": 6, "medium": 3, "low": 1}
 FILE_SCOPE_WEIGHT = 2
 RESOURCE_SCOPE_WEIGHT = 1
 RISK_SCORE_DECAY = 4
+AWS_ACCESS_KEY_PATTERN = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
+SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(?im)(?P<key_quote>[\"']?)(?P<key>[A-Za-z0-9_.:-]*"
+    r"(?:password|passwd|secret|api[_-]?key|access[_-]?key|token|client[_-]?secret|private[_-]?key)"
+    r"[A-Za-z0-9_.:-]*)(?P=key_quote)\s*[:=]\s*"
+    r"(?P<value>\"[^\"\n]*\"|'[^'\n]*'|[^\s,#}\]]+)"
+)
+NON_LITERAL_SECRET_PREFIXES = ("${", "var.", "local.", "module.", "data.", "file(", "jsonencode(", "sensitive(")
+PLACEHOLDER_SECRET_VALUES = {
+    "",
+    "changeme",
+    "change-me",
+    "password",
+    "replace-me",
+    "replace_me",
+    "todo",
+    "tbd",
+    "null",
+    "none",
+    "true",
+    "false",
+}
 
 
 @dataclass(frozen=True)
@@ -175,6 +200,49 @@ def _finding(
         evidence=evidence,
         recommendation=rule.recommendation,
     )
+
+
+def _hardcoded_secret(rule: Rule, context: ScanContext) -> list[FindingCandidate]:
+    findings: list[FindingCandidate] = []
+    finding_lines: set[int] = set()
+
+    for match in AWS_ACCESS_KEY_PATTERN.finditer(context.content):
+        line_number = _line_number(context.content, match.start())
+        if line_number in finding_lines:
+            continue
+        finding_lines.add(line_number)
+        findings.append(
+            _finding(
+                rule,
+                context,
+                line_number,
+                _nearest_context_resource(context, match.start()),
+                _redact_secret_line(_line_at(context.content, match.start())),
+            )
+        )
+
+    for match in SECRET_ASSIGNMENT_PATTERN.finditer(context.content):
+        line_number = _line_number(context.content, match.start())
+        if line_number in finding_lines:
+            continue
+
+        key = match.group("key")
+        value = _secret_value(match.group("value"))
+        if not _is_hardcoded_secret_value(key, value):
+            continue
+
+        finding_lines.add(line_number)
+        findings.append(
+            _finding(
+                rule,
+                context,
+                line_number,
+                _nearest_context_resource(context, match.start()),
+                f"{key} = <redacted>",
+            )
+        )
+
+    return findings
 
 
 def _public_s3_acl(rule: Rule, context: ScanContext) -> list[FindingCandidate]:
@@ -383,6 +451,14 @@ RULES = (
         check=_open_ssh_ingress,
     ),
     Rule(
+        rule_id="HARDCODED_SECRET",
+        title="Hardcoded credential detected",
+        severity="critical",
+        description="Detects AWS access keys and hardcoded password, token, secret, and API key assignments.",
+        recommendation=SECRET_RECOMMENDATION,
+        check=_hardcoded_secret,
+    ),
+    Rule(
         rule_id="S3_PUBLIC_ACL",
         title="Public S3 ACL detected",
         severity="high",
@@ -450,6 +526,29 @@ def _has_wildcard(value) -> bool:
     return False
 
 
+def _secret_value(raw_value: str) -> str:
+    return raw_value.strip().strip('"\'')
+
+
+def _is_hardcoded_secret_value(key: str, value: str) -> bool:
+    normalized = value.strip()
+    lowered = normalized.lower()
+    if lowered in PLACEHOLDER_SECRET_VALUES:
+        return False
+    if lowered.startswith(NON_LITERAL_SECRET_PREFIXES):
+        return False
+    if len(normalized) < _minimum_secret_length(key):
+        return False
+    return True
+
+
+def _minimum_secret_length(key: str) -> int:
+    key_lower = key.lower()
+    if "password" in key_lower or "passwd" in key_lower:
+        return 4
+    return 8
+
+
 def _safe_int(value, default: int) -> int:
     try:
         return int(value)
@@ -483,6 +582,27 @@ def _nearest_resource(content: str, index: int) -> str:
         return "Unknown resource"
     last = matches[-1]
     return f"{last.group(1)}.{last.group(2)}"
+
+
+def _nearest_context_resource(context: ScanContext, index: int) -> str:
+    if context.json_resources is not None:
+        resource = _nearest_json_resource(context, index)
+        if resource:
+            return resource
+    return _nearest_resource(context.content, index)
+
+
+def _nearest_json_resource(context: ScanContext, index: int) -> Optional[str]:
+    nearest: Optional[tuple[int, str]] = None
+    for resource_name, resource_type, _ in _iter_json_resources(context):
+        match = re.search(rf'"{re.escape(resource_name)}"\s*:', context.content)
+        if match and match.start() <= index and (nearest is None or match.start() > nearest[0]):
+            nearest = (match.start(), f"{resource_type}.{resource_name}")
+    return nearest[1] if nearest else None
+
+
+def _redact_secret_line(line: str) -> str:
+    return AWS_ACCESS_KEY_PATTERN.sub(lambda match: f"{match.group(0)[:4]}****************", line)
 
 
 def _compact(value: str) -> str:

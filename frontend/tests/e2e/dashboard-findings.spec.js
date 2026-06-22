@@ -28,17 +28,17 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await page.getByRole("button", { name: "Run Sample Scan" }).click();
 
     await expect(page.getByRole("button", { name: "Scanning..." })).toBeVisible();
-    await expect(page.getByText("55 findings across 10 files")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Critical\s+14/ })).toBeVisible();
+    await expect(page.getByText("67 findings across 10 files")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Critical\s+26/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /High\s+15/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Medium\s+14/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Low\s+12/ })).toBeVisible();
-    await expect(page.getByText("55 matching findings")).toBeVisible();
-    await expect(page.getByText("Page 1 of 11")).toBeVisible();
+    await expect(page.getByText("67 matching findings")).toBeVisible();
+    await expect(page.getByText("Page 1 of 14")).toBeVisible();
     await expect(page.locator("tbody tr")).toHaveCount(5);
     await expect(page.getByRole("heading", { name: "Recent Scans" })).toBeVisible();
     await expect(page.getByText("Sample local IaC scan")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Sample local IaC scan\s+0\s+2026-06-22 22:35/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Sample local IaC scan\s+47\s+2026-06-22 22:35/ })).toBeVisible();
     expectNoFrontendErrors(frontendErrors);
   });
 
@@ -58,8 +58,8 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
 
     await page.goto("/");
 
-    await expect(page.getByText("55 findings across 10 files")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Current sample scan\s+0\s+2026-06-22 22:35/ })).toHaveAttribute(
+    await expect(page.getByText("67 findings across 10 files")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Current sample scan\s+47\s+2026-06-22 22:35/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
@@ -183,7 +183,7 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
 
     await expect(page.getByRole("button", { name: /Low\s+12/ })).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator('ol[aria-label="Current finding filter"]')).not.toContainText("Low");
-    await expect(page.getByText("55 matching findings")).toBeVisible();
+    await expect(page.getByText("67 matching findings")).toBeVisible();
     expectNoFrontendErrors(frontendErrors);
   });
 
@@ -205,14 +205,14 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await search.fill("");
     await page.getByLabel("Rows").selectOption("10");
     await expect(page.locator("tbody tr")).toHaveCount(10);
-    await expect(page.getByText("Page 1 of 6")).toBeVisible();
+    await expect(page.getByText("Page 1 of 7")).toBeVisible();
 
     await page.getByRole("button", { name: "Next" }).click();
-    await expect(page.getByText("Page 2 of 6")).toBeVisible();
+    await expect(page.getByText("Page 2 of 7")).toBeVisible();
     await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
 
     await page.getByRole("button", { name: "Previous" }).click();
-    await expect(page.getByText("Page 1 of 6")).toBeVisible();
+    await expect(page.getByText("Page 1 of 7")).toBeVisible();
     expectNoFrontendErrors(frontendErrors);
   });
 
@@ -301,7 +301,7 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await page.getByRole("button", { name: "Run Sample Scan" }).click();
 
     await expect(page.getByRole("alert")).toHaveText("Sample scan failed");
-    await expect(page.getByText("55 findings across 10 files")).toBeVisible();
+    await expect(page.getByText("67 findings across 10 files")).toBeVisible();
     expectOnlyExpectedResourceErrors(frontendErrors, ["500"]);
   });
 });

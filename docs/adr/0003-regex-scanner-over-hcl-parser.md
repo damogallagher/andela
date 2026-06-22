@@ -9,6 +9,7 @@ Date: 2026-06-23
 The scanner needs to identify a small, explicit set of risky infrastructure patterns in Terraform and JSON CloudFormation-style files:
 
 - Public SSH ingress
+- Hardcoded credentials and AWS access key patterns
 - Public S3 ACLs
 - Wildcard IAM policies
 - Disabled database encryption
