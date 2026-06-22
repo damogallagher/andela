@@ -200,3 +200,11 @@ the page is very squased, update it to use more screen real estate
 ```
 
 Agent action: Widened the dashboard content area, expanded findings to a full-width row, and changed recent scans into a wider responsive audit-trail band to reduce table crowding.
+
+## 2026-06-22 23:55 IST - Prompt 024 - Docker Compose React Auto Refresh
+
+```text
+Update the docker-compose.yaml file, if the frontend react code changes, make sure the browser screen auto refreshes
+```
+
+Agent action: Added a Docker Compose Vite frontend service with hot reload on port 5173, configured Docker-friendly API proxying, and documented the auto-refresh development workflow.

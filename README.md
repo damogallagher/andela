@@ -32,6 +32,7 @@ docker compose up --build
 Open:
 
 - Dashboard: http://localhost:8000
+- React dev dashboard with auto-refresh: http://localhost:5173/static/frontend/
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
@@ -41,6 +42,7 @@ The default Compose configuration starts:
 
 - `andela-app` on port `8000`
 - `andela-postgres` on port `5432`
+- `andela-frontend` on port `5173` for Vite hot reload during React development
 
 ## Frontend Development
 
@@ -57,6 +59,14 @@ Run the Vite dev server while the FastAPI app is running:
 ```bash
 npm --prefix frontend run dev
 ```
+
+Or use Docker Compose for browser auto-refresh when React files change:
+
+```bash
+docker compose up frontend
+```
+
+Open http://localhost:5173/static/frontend/. The Vite dev server proxies `/api` and `/health` to the Compose `app` service.
 
 ## Run A Sample Scan
 
