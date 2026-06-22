@@ -216,3 +216,11 @@ Make the results table scrollable horizontally. Also let users sort on teh table
 ```
 
 Agent action: Made the findings table a horizontally scrollable region with fixed-width columns, added sortable table headers for all findings columns, moved recent scans into a desktop right-side history rail, and expanded Playwright coverage for sorting, table overflow, and desktop history placement.
+
+## 2026-06-23 00:05 IST - Prompt 026 - Score Threshold Colors
+
+```text
+If score is above 90, show the final score in greeen, come up with different thresholds to show the percentage score in amber or red
+```
+
+Agent action: Updated the React score panel to display the score as a percentage, color it green above 90, amber from 70 to 90, and red below 70, and added Playwright coverage for the threshold boundaries.

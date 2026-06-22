@@ -77,6 +77,41 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     expectNoFrontendErrors(frontendErrors);
   });
 
+  test("colors the score percentage by threshold", async ({ page }) => {
+    const frontendErrors = trackFrontendErrors(page);
+    const greenScan = sampleScan({
+      id: 401,
+      label: "Green score scan",
+      risk_score: 95,
+    });
+    const amberScan = sampleScan({
+      id: 402,
+      label: "Amber score scan",
+      risk_score: 90,
+    });
+    const redScan = sampleScan({
+      id: 403,
+      label: "Red score scan",
+      risk_score: 69,
+    });
+    await mockScanHistory(page, [greenScan, amberScan, redScan]);
+
+    await page.goto("/");
+
+    const score = page.locator("#score-title");
+    await expect(score).toHaveText("95%");
+    await expect(score).toHaveCSS("color", "rgb(21, 128, 61)");
+
+    await page.getByRole("button", { name: /Amber score scan\s+90/ }).click();
+    await expect(score).toHaveText("90%");
+    await expect(score).toHaveCSS("color", "rgb(183, 121, 31)");
+
+    await page.getByRole("button", { name: /Red score scan\s+69/ }).click();
+    await expect(score).toHaveText("69%");
+    await expect(score).toHaveCSS("color", "rgb(185, 28, 28)");
+    expectNoFrontendErrors(frontendErrors);
+  });
+
   test("filters findings by severity and clears the breadcrumb state", async ({ page }) => {
     const frontendErrors = trackFrontendErrors(page);
     await mockScanHistory(page, [sampleScan()]);

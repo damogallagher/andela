@@ -20,7 +20,7 @@ const ScorePanel = styled(Panel)`
 
 const Score = styled.h2`
   margin: 0;
-  color: ${theme.colors.text};
+  color: ${({ $scoreColor }) => $scoreColor || theme.colors.text};
   font-size: 4rem;
   line-height: 1;
 `;
@@ -34,7 +34,7 @@ const Meter = styled.div`
   width: 112px;
   height: 112px;
   border-radius: 999px;
-  background: conic-gradient(${theme.colors.teal} calc(${({ $score }) => $score} * 1%), #dde6ea 0);
+  background: conic-gradient(${({ $scoreColor }) => $scoreColor} calc(${({ $score }) => $score} * 1%), #dde6ea 0);
   display: grid;
   place-items: center;
 
@@ -47,19 +47,30 @@ const Meter = styled.div`
   }
 `;
 
+function scoreColor(score) {
+  if (score > 90) {
+    return theme.colors.scoreGreen;
+  }
+  if (score >= 70) {
+    return theme.colors.scoreAmber;
+  }
+  return theme.colors.scoreRed;
+}
+
 export function RiskScorePanel({ scan }) {
   const score = scan?.risk_score ?? 0;
+  const color = scan ? scoreColor(score) : theme.colors.text;
 
   return (
     <ScorePanel aria-labelledby="score-title">
       <div>
         <Eyebrow>Current Risk Score</Eyebrow>
-        <Score id="score-title">{scan ? score : "No scan"}</Score>
+        <Score id="score-title" $scoreColor={color}>{scan ? `${score}%` : "No scan"}</Score>
         <Detail>
           {scan ? `${scan.findings_count} findings across ${scan.files_scanned} files` : "Run the sample scan to populate the dashboard."}
         </Detail>
       </div>
-      <Meter $score={score} aria-hidden="true" />
+      <Meter $score={score} $scoreColor={color} aria-hidden="true" />
     </ScorePanel>
   );
 }
