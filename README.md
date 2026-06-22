@@ -74,7 +74,14 @@ The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM polic
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest
+```
+
+Use the scripts directory to run the test scopes:
+
+```bash
+./scripts/test-unit.sh
+./scripts/test-functional.sh
+./scripts/test-all.sh
 ```
 
 The test suite includes scanner unit tests for each fixture scenario and FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard rendering, rules metadata, missing paths, and scan-root path safety.

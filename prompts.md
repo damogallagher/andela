@@ -86,3 +86,11 @@ Run the expanded test suite, clean up framework deprecation warnings found durin
 ```
 
 Agent action: Migrated FastAPI startup to a lifespan handler, updated template rendering to the current signature, and replaced Pydantic class Config usage with ConfigDict.
+
+## 2026-06-22 - Prompt 010 - Test Runner Scripts
+
+```text
+Create a scripts directory, add scripts to run the unit tests, the functional tests and finallu all tests
+```
+
+Agent action: Added executable scripts for unit tests, functional tests, and the full test suite; updated README.md with the script commands.
