@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: andela-postgres
+    environment:
+      POSTGRES_DB: andela_guardrails
+      POSTGRES_USER: andela
+      POSTGRES_PASSWORD: andela
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andela -d andela_guardrails"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: andela-app
+    environment:
+      DATABASE_URL: postgresql+psycopg://andela:andela@db:5432/andela_guardrails
+      APP_SCAN_ROOT: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres-data:
+

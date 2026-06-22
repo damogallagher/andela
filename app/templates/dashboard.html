@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Andela Guardrail Auditor</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Local-only security scanner</p>
+        <h1>Enterprise Security Guardrail Auditor</h1>
+      </div>
+      <nav class="actions" aria-label="Primary actions">
+        <button id="run-scan" type="button">Run Sample Scan</button>
+        <a href="/docs">API Docs</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="score-panel" aria-labelledby="score-title">
+        <div>
+          <p class="eyebrow">Current Risk Score</p>
+          <h2 id="score-title">{{ latest_scan.risk_score if latest_scan else "No scan" }}</h2>
+          <p class="muted">
+            {% if latest_scan %}
+              {{ latest_scan.findings_count }} findings across {{ latest_scan.files_scanned }} files
+            {% else %}
+              Run the sample scan to populate the dashboard.
+            {% endif %}
+          </p>
+        </div>
+        <div class="score-meter" aria-hidden="true">
+          <span style="--score: {{ latest_scan.risk_score if latest_scan else 0 }}"></span>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Finding counts">
+        <article>
+          <span>Critical</span>
+          <strong>{{ severity_counts.critical }}</strong>
+        </article>
+        <article>
+          <span>High</span>
+          <strong>{{ severity_counts.high }}</strong>
+        </article>
+        <article>
+          <span>Medium</span>
+          <strong>{{ severity_counts.medium }}</strong>
+        </article>
+        <article>
+          <span>Low</span>
+          <strong>{{ severity_counts.low }}</strong>
+        </article>
+      </section>
+
+      <section class="findings" aria-labelledby="findings-title">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Latest scan</p>
+            <h2 id="findings-title">Findings</h2>
+          </div>
+          {% if latest_scan %}
+            <span class="timestamp">{{ latest_scan.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</span>
+          {% endif %}
+        </div>
+
+        {% if latest_scan and latest_scan.findings %}
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Severity</th>
+                  <th>Rule</th>
+                  <th>Resource</th>
+                  <th>File</th>
+                  <th>Recommendation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for finding in latest_scan.findings %}
+                  <tr>
+                    <td><span class="badge {{ finding.severity }}">{{ finding.severity }}</span></td>
+                    <td>{{ finding.title }}</td>
+                    <td>{{ finding.resource }}</td>
+                    <td>{{ finding.file_path }}:{{ finding.line_number }}</td>
+                    <td>{{ finding.recommendation }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="empty">No findings available yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="history" aria-labelledby="history-title">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Postgres-backed audit trail</p>
+            <h2 id="history-title">Recent Scans</h2>
+          </div>
+        </div>
+        {% if history %}
+          <ol>
+            {% for scan in history %}
+              <li>
+                <span>{{ scan.label }}</span>
+                <strong>{{ scan.risk_score }}</strong>
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <p class="empty">No scan history yet.</p>
+        {% endif %}
+      </section>
+    </main>
+
+    <script>
+      const button = document.querySelector("#run-scan");
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        button.textContent = "Scanning...";
+        const response = await fetch("/api/scans/sample", { method: "POST" });
+        if (!response.ok) {
+          button.textContent = "Scan Failed";
+          button.disabled = false;
+          return;
+        }
+        window.location.reload();
+      });
+    </script>
+  </body>
+</html>
+

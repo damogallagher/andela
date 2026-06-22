@@ -1,0 +1,64 @@
+# Prompt Audit Log
+
+This file is maintained by the AI agent as part of the challenge workflow.
+
+## 2026-06-22 - Prompt 001 - Required Initial Execution Prompt
+
+```text
+Lead Architect mode: ON. We are building a Python-based, API-first Enterprise Security Guardrail Auditor using a free database and a dashboard.
+
+Rules:
+- No Manual Edits: You provide all logic and fixes. I will not edit any code.
+- Audit Log: You must maintain a file named prompts.md. After every turn, update that file with the prompt I just used.
+- Time-Check: Start a timer. Goal is an MVP in 4-6 hours (Max window: 16h). Report "Elapsed Time" at the end of every response.
+
+Acknowledge and let's start.
+```
+
+Agent action: Established the project direction and challenge rules.
+
+## 2026-06-22 - Prompt 002 - User Implementation Directives
+
+```text
+1. Start project in /Users/damien/Development/sourceControl/Personal/andela
+2. Yes, create an AGENTS.md file to state this exact point
+3. Yes please, make the AI manage ALL prompts for me
+4. Sounds good, insetad of SQLite, use a postgres database, laod up the database and the application using a docker-compose.yaml file. Maintain a README.md file with details on running locally. Add it to AGENTS.md that this file needs to be kep up to date
+5. Yes this is a last step, we will generate the presentation deck based on the code content
+6. Yes create a repo in github.com/damogallagher/andela
+7. For this exercise I want to go local build only
+```
+
+Agent action: Scaffolded the local-only FastAPI/Postgres project, Docker Compose setup, README, AGENTS.md, prompt audit log, sample IaC fixtures, and scanner tests.
+
+## 2026-06-22 - Prompt 003 - Verification Fix
+
+```text
+Verify the local Python test environment, fix dependency issues found during installation, and keep prompts.md updated as the AI-managed audit log.
+```
+
+Agent action: Updated the psycopg binary dependency from 3.2.3 to 3.2.13 because the earlier patch version was not available for the local Python environment.
+
+## 2026-06-22 - Prompt 004 - Test Import Fix
+
+```text
+Run the project tests, fix local test configuration issues, and keep the prompt audit log current.
+```
+
+Agent action: Added pytest configuration in pyproject.toml so tests can import the local app package from the repository root.
+
+## 2026-06-22 - Prompt 005 - Result Ordering Polish
+
+```text
+Verify the running app output, fix any presentation issues that reduce dashboard clarity, and keep prompts.md current.
+```
+
+Agent action: Sorted findings by operational severity so critical results appear before high, medium, and low findings in API and dashboard output.
+
+## 2026-06-22 - Prompt 006 - Global Severity Sort Fix
+
+```text
+Rerun tests after the severity ordering change, correct any failing behavior, and keep prompts.md current.
+```
+
+Agent action: Moved severity sorting to the full scan aggregation so findings are ordered correctly across all scanned files.
