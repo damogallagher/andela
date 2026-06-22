@@ -1,11 +1,9 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -28,7 +26,6 @@ app = FastAPI(
     description="Local-only API-first IaC security scanner with Postgres-backed scan history.",
     lifespan=lifespan,
 )
-templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -38,18 +35,11 @@ def health() -> dict[str, str]:
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    latest_scan = _latest_scan(db)
-    history = db.scalars(select(ScanRun).order_by(ScanRun.created_at.desc()).limit(8)).all()
-    return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
-            "latest_scan": latest_scan,
-            "history": history,
-            "severity_counts": _severity_counts(latest_scan.findings if latest_scan else []),
-        },
-    )
+def dashboard() -> FileResponse:
+    frontend_index = Path("app/static/frontend/index.html")
+    if not frontend_index.exists():
+        raise HTTPException(status_code=503, detail="Frontend build is missing. Run npm --prefix frontend run build.")
+    return FileResponse(frontend_index)
 
 
 @app.post("/api/scans/sample", response_model=ScanResponse)
@@ -145,6 +135,11 @@ def rules() -> list[dict[str, str]]:
             "severity": "medium",
             "description": "Detects database resources with storage encryption disabled.",
         },
+        {
+            "rule_id": "S3_VERSIONING_DISABLED",
+            "severity": "low",
+            "description": "Detects S3 buckets with versioning explicitly disabled or suspended.",
+        },
     ]
 
 
@@ -192,20 +187,3 @@ def _resolve_scan_target(raw_path: str) -> Path:
     if scan_root not in (resolved, *resolved.parents):
         raise HTTPException(status_code=400, detail="Scan path must stay under APP_SCAN_ROOT.")
     return resolved
-
-
-def _latest_scan(db: Session) -> Optional[ScanRun]:
-    return db.scalar(
-        select(ScanRun)
-        .options(selectinload(ScanRun.findings))
-        .order_by(ScanRun.created_at.desc())
-        .limit(1)
-    )
-
-
-def _severity_counts(findings: list[Finding]) -> dict[str, int]:
-    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-    for finding in findings:
-        key = finding.severity.lower()
-        counts[key] = counts.get(key, 0) + 1
-    return counts

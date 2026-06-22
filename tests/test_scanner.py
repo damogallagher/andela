@@ -63,16 +63,40 @@ def test_clean_scenario_has_full_score() -> None:
     assert result.risk_score == 100
 
 
+def test_large_violations_scenario_exercises_all_severity_categories() -> None:
+    result = scan_path(SCENARIOS / "large_violations")
+
+    assert result.files_scanned == 2
+    assert Counter(finding.severity for finding in result.findings) == Counter(
+        {
+            "critical": 12,
+            "high": 12,
+            "medium": 12,
+            "low": 12,
+        }
+    )
+    assert Counter(finding.rule_id for finding in result.findings) == Counter(
+        {
+            "OPEN_SSH_INGRESS": 12,
+            "S3_PUBLIC_ACL": 12,
+            "DATABASE_ENCRYPTION_DISABLED": 12,
+            "S3_VERSIONING_DISABLED": 12,
+        }
+    )
+    assert result.risk_score == 0
+
+
 def test_all_sample_iac_scenarios_are_scanned_together() -> None:
     result = scan_path(Path("sample_iac"))
 
-    assert result.files_scanned == 8
+    assert result.files_scanned == 10
     assert Counter(finding.rule_id for finding in result.findings) == Counter(
         {
-            "OPEN_SSH_INGRESS": 2,
-            "S3_PUBLIC_ACL": 2,
-            "DATABASE_ENCRYPTION_DISABLED": 2,
+            "OPEN_SSH_INGRESS": 14,
+            "S3_PUBLIC_ACL": 14,
+            "DATABASE_ENCRYPTION_DISABLED": 14,
             "IAM_WILDCARD_POLICY": 1,
+            "S3_VERSIONING_DISABLED": 12,
         }
     )
     assert result.risk_score == 0
