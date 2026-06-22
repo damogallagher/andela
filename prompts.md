@@ -248,3 +248,26 @@ update docker-compose.yaml to use postgres 17 instead of 16
 ```
 
 Agent action: Updated the Docker Compose database service from `postgres:16-alpine` to `postgres:17-alpine` and documented the local Postgres 17 service in README.
+
+## 2026-06-23 00:17 IST - Prompt 030 - GitHub Actions Node Runtime Updates
+
+```text
+The github actions are making the following complaints. [Terraform format and validate](https://github.com/damogallagher/andela/actions/runs/27990411036/job/82841371598#step:13:2)
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, hashicorp/setup-terraform@v3. For more information see: [https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
+[Backend lint and tests](https://github.com/damogallagher/andela/actions/runs/27990411036/job/82841371583#step:17:2)
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/setup-python@v5. For more information see: [https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
+[UI lint, build, and Playwright](https://github.com/damogallagher/andela/actions/runs/27990411036/job/82841371485#step:17:2)
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: [https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
+[Docker build](https://github.com/damogallagher/andela/actions/runs/27990411036/job/82841474314#step:9:2)
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, docker/build-push-action@v6, docker/setup-buildx-action@v3. For more information see: [https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/) Update the versions appropriately. Make sure dependabot is setup to also update the github actions
+```
+
+Agent action: Updated GitHub Actions workflow dependencies to newer major versions for checkout, setup-node, setup-python, setup-terraform, Docker build/setup, and AWS credential configuration, and confirmed Dependabot includes the `github-actions` ecosystem.
+
+## 2026-06-23 00:19 IST - Prompt 031 - Postgres 17 Volume Compatibility
+
+```text
+The attached docker-compose output shows Postgres 17 failing to start because the existing Docker volume was initialized by Postgres 16: "database files are incompatible with server".
+```
+
+Agent action: Updated Docker Compose to use a new `postgres17-data` volume for Postgres 17, preserving the old Postgres 16 `postgres-data` volume, and documented the local volume migration note in README.

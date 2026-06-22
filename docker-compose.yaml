@@ -14,7 +14,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres17-data:/var/lib/postgresql/data
 
   app:
     build: .
@@ -46,5 +46,5 @@ services:
       - frontend-node-modules:/workspace/frontend/node_modules
 
 volumes:
-  postgres-data:
+  postgres17-data:
   frontend-node-modules:
