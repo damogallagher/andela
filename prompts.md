@@ -152,3 +152,35 @@ the react upgrade is not listed in prompts.md
 ```
 
 Agent action: Split the previous combined prompt-log entry so the React frontend conversion is listed explicitly as its own prompt.
+
+## 2026-06-22 23:40 IST - Prompt 018 - GitHub Actions And AWS Terraform Deployment
+
+```text
+Create github actions for linting the code both ui and backend, building the code and deploying the code to AWS. For deploying to AWS, we also need a terraform folder with all of the infrastructure to run the application. For terraform, ensure state is stored in an S3 bucket. Include this terraform build step as part of the github actions. Also include unit tests and playwright tests as part of the github actions to ensure they run.
+```
+
+Agent action: Added backend and frontend lint tooling, GitHub Actions CI/CD for linting, build, tests, Terraform validation, Docker build, and conditional AWS deployment from dev; added Terraform infrastructure for ECR, ECS Fargate, ALB, RDS Postgres, Secrets Manager, IAM, networking, and S3-backed state configuration.
+
+## 2026-06-22 23:41 IST - Prompt 019 - Claude Code Idea Review Provenance
+
+```text
+When the project goto a certain stage, I ran the current cdoe throuh claude code to get ideas. Add this to the AGENTS.md and include it in prompts.md
+```
+
+Agent action: Updated AGENTS.md and prompts.md to record that Claude Code was used for external idea review while Codex remains the agent of record for repository edits and verification.
+
+## 2026-06-22 23:42 IST - Prompt 020 - Dev Branch Workflow
+
+```text
+From now on, make all changes in the dev branch and push that branch to github
+```
+
+Agent action: Switched active work to the dev branch, fast-forwarded dev to the latest implementation baseline, and updated AGENTS.md to require future changes and pushes on dev.
+
+## 2026-06-22 23:48 IST - Prompt 021 - Static Frontend Build Output Clarification
+
+```text
+app/static/frontend still exists - is this folder still being used now that we have a react frontend?
+```
+
+Agent action: Clarified that `app/static/frontend` is generated React build output served by FastAPI, while source code lives in `frontend/src`; the generated output remains ignored by Git.

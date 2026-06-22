@@ -1,8 +1,8 @@
 # Andela Enterprise Security Guardrail Auditor
 
-Python-based, API-first security guardrail auditor for the Andela New Hire Challenge. The app scans Terraform and JSON infrastructure files for risky patterns, stores scan results in Postgres, and renders a local dashboard with a visual risk score.
+Python-based, API-first security guardrail auditor for the Andela New Hire Challenge. The app scans Terraform and JSON infrastructure files for risky patterns, stores scan results in Postgres, and renders a dashboard with a visual risk score.
 
-This project is intentionally local-only. It does not create AWS, Azure, or other cloud resources.
+Local development is intentionally Docker Compose based. Optional AWS deployment is defined through Terraform and GitHub Actions and should only run with explicitly configured AWS credentials.
 
 ## Stack
 
@@ -14,6 +14,8 @@ This project is intentionally local-only. It does not create AWS, Azure, or othe
 - Docker Compose for local app and database startup
 - Pytest for scanner tests
 - Playwright for frontend browser tests
+- Ruff and ESLint for backend and UI linting
+- Terraform and GitHub Actions for optional AWS deployment
 
 ## Coding Agent And Model
 
@@ -110,6 +112,7 @@ pip install -r requirements-dev.txt
 Use the scripts directory to run the test scopes:
 
 ```bash
+./scripts/lint-all.sh
 ./scripts/test-unit.sh
 ./scripts/test-functional.sh
 ./scripts/test-playwright.sh
@@ -120,6 +123,57 @@ The functional and full test scripts build the React frontend before running Fas
 
 The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
 
+## GitHub Actions CI/CD
+
+The workflow in `.github/workflows/ci-cd.yml` runs on pull requests and pushes to `dev`.
+
+It performs:
+
+- Backend linting with Ruff and Python compile checks.
+- Python unit and functional tests.
+- UI linting with ESLint.
+- React production build.
+- Playwright browser tests.
+- Terraform formatting and validation.
+- Docker image build.
+
+AWS deployment runs from the `dev` branch when the required repository variables are configured. The deploy job uses GitHub OIDC to assume an AWS role, initializes Terraform with an S3 backend, ensures the ECR repository exists, builds and pushes the Docker image, then applies the ECS/RDS/ALB infrastructure.
+
+Required GitHub repository variables for deployment:
+
+- `AWS_ROLE_TO_ASSUME`: IAM role ARN trusted by GitHub OIDC.
+- `AWS_REGION`: AWS region, for example `us-east-1`.
+- `TF_STATE_BUCKET`: pre-created S3 bucket for Terraform state.
+- `TF_STATE_LOCK_TABLE`: pre-created DynamoDB table for Terraform state locking.
+
+Optional GitHub repository variables:
+
+- `TF_STATE_KEY`: defaults to `andela/terraform.tfstate`.
+- `PROJECT_NAME`: defaults to `andela-guardrail-auditor`.
+- `DEPLOY_ENVIRONMENT`: defaults to `dev`.
+- `ALLOWED_INGRESS_CIDR`: defaults to `0.0.0.0/0`; narrow this for non-demo deployments.
+
+## Terraform
+
+Terraform lives in `terraform/` and provisions:
+
+- ECR repository for application images.
+- VPC, public subnets, internet gateway, and route tables.
+- Application Load Balancer.
+- ECS Fargate cluster, task definition, and service.
+- RDS Postgres for scan history.
+- Secrets Manager secret for the application `DATABASE_URL`.
+- IAM roles and CloudWatch logging.
+
+Terraform state is configured through the S3 backend in `terraform/versions.tf`. Use `terraform/backend.example.hcl` as a template for local initialization if needed:
+
+```bash
+cp terraform/backend.example.hcl terraform/backend.hcl
+terraform -chdir=terraform init -backend-config=backend.hcl
+```
+
+Do not commit `terraform/backend.hcl` because it contains environment-specific state backend settings.
+
 ## Challenge Submission Notes
 
 Include these artifacts in the final submission:
@@ -128,4 +182,4 @@ Include these artifacts in the final submission:
 - Public GitHub repository link
 - `prompts.md` audit log
 - AI-generated presentation deck, created after the code is complete
-- Cloud cleanup confirmation: no cloud resources were created; this was a local-only Docker Compose build
+- Cloud cleanup confirmation: no cloud resources were created from the local agent workspace; AWS deployment runs only through configured GitHub Actions and Terraform.

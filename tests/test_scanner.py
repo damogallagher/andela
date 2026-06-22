@@ -3,7 +3,6 @@ from pathlib import Path
 
 from app.scanner import ScanInputFile, calculate_risk_score, scan_files, scan_path
 
-
 SCENARIOS = Path("sample_iac/scenarios")
 
 

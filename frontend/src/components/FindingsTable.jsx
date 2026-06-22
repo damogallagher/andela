@@ -195,7 +195,7 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
   const [query, setQuery] = useState("");
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
-  const findings = scan?.findings || [];
+  const findings = useMemo(() => scan?.findings || [], [scan]);
 
   const filteredFindings = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

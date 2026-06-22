@@ -1,11 +1,12 @@
-from dataclasses import dataclass
 import json
-from pathlib import Path
 import re
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
-
 SUPPORTED_EXTENSIONS = {".tf", ".json", ".template", ".yaml", ".yml"}
+SSH_RECOMMENDATION = "Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern."
+S3_VERSIONING_RECOMMENDATION = "Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion."
 
 
 @dataclass(frozen=True)
@@ -187,7 +188,7 @@ def _json_open_ssh_ingress(
                     line_number=_json_key_line(content, "SecurityGroupIngress"),
                     resource=f"{resource_type}.{resource_name}",
                     evidence=_compact(json.dumps(ingress_rule, sort_keys=True)),
-                    recommendation="Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern.",
+                    recommendation=SSH_RECOMMENDATION,
                 )
             )
     return findings
@@ -224,7 +225,8 @@ def _json_wildcard_iam_policy(
     properties: dict,
 ) -> list[FindingCandidate]:
     policy_documents = _policy_documents(properties)
-    if not resource_type.startswith("AWS::IAM::") or not any(_policy_has_wildcards(policy) for policy in policy_documents):
+    has_wildcard_policy = any(_policy_has_wildcards(policy) for policy in policy_documents)
+    if not resource_type.startswith("AWS::IAM::") or not has_wildcard_policy:
         return []
     return [
         FindingCandidate(
@@ -262,7 +264,7 @@ def _json_s3_versioning_disabled(
             line_number=_json_key_line(content, "VersioningConfiguration"),
             resource=f"{resource_type}.{resource_name}",
             evidence=f'"VersioningConfiguration": "{status}"',
-            recommendation="Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion.",
+            recommendation=S3_VERSIONING_RECOMMENDATION,
         )
     ]
 
@@ -334,7 +336,7 @@ def _open_ssh_ingress(file_path: str, content: str) -> list[FindingCandidate]:
                     line_number=_line_number(content, block.start()),
                     resource=_nearest_resource(content, block.start()),
                     evidence=_compact(body),
-                    recommendation="Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern.",
+                    recommendation=SSH_RECOMMENDATION,
                 )
             )
     return findings
@@ -403,7 +405,7 @@ def _s3_versioning_disabled(file_path: str, content: str) -> list[FindingCandida
                     line_number=_line_number(content, match.start()),
                     resource=_nearest_resource(content, match.start() + disabled.start()),
                     evidence=_compact(body),
-                    recommendation="Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion.",
+                    recommendation=S3_VERSIONING_RECOMMENDATION,
                 )
             )
     return findings

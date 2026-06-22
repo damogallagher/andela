@@ -1,0 +1,210 @@
+name: CI CD
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to AWS after tests pass
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.PROJECT_NAME || 'andela-guardrail-auditor' }}
+  DEPLOY_ENVIRONMENT: ${{ vars.DEPLOY_ENVIRONMENT || 'dev' }}
+  ALLOWED_INGRESS_CIDR: ${{ vars.ALLOWED_INGRESS_CIDR || '0.0.0.0/0' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'andela/terraform.tfstate' }}
+  TERRAFORM_VERSION: 1.15.5
+
+jobs:
+  backend:
+    name: Backend lint and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node for functional test frontend build
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint backend
+        run: ./scripts/lint-backend.sh
+
+      - name: Run unit tests
+        run: ./scripts/test-unit.sh
+
+      - name: Run functional tests
+        run: ./scripts/test-functional.sh
+
+  frontend:
+    name: UI lint, build, and Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install UI dependencies
+        run: npm --prefix frontend ci
+
+      - name: Lint UI
+        run: npm --prefix frontend run lint
+
+      - name: Build UI
+        run: npm --prefix frontend run build
+
+      - name: Install Playwright browsers
+        run: npm --prefix frontend exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          PLAYWRIGHT_USE_SYSTEM_CHROME: "0"
+        run: npm --prefix frontend run test:e2e
+
+  terraform:
+    name: Terraform format and validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform format check
+        run: terraform -chdir=terraform fmt -check -recursive
+
+      - name: Terraform init without backend
+        run: terraform -chdir=terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+      - terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build application image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ${{ env.PROJECT_NAME }}:${{ github.sha }}
+
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+      - terraform
+      - docker-build
+    if: >
+      github.ref == 'refs/heads/dev' &&
+      vars.AWS_ROLE_TO_ASSUME != '' &&
+      vars.TF_STATE_BUCKET != '' &&
+      vars.TF_STATE_LOCK_TABLE != '' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform init with S3 backend
+        run: |
+          terraform -chdir=terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${{ vars.TF_STATE_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Ensure ECR repository exists
+        run: |
+          terraform -chdir=terraform apply -auto-approve \
+            -target=aws_ecr_repository.app \
+            -var="aws_region=${AWS_REGION}" \
+            -var="project_name=${PROJECT_NAME}" \
+            -var="environment=${DEPLOY_ENVIRONMENT}" \
+            -var="allowed_ingress_cidr=${ALLOWED_INGRESS_CIDR}" \
+            -var="container_image=bootstrap"
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push application image
+        id: image
+        run: |
+          ECR_REPOSITORY_URL="$(terraform -chdir=terraform output -raw ecr_repository_url)"
+          IMAGE_URI="${ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+          docker build -t "${IMAGE_URI}" .
+          docker push "${IMAGE_URI}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+
+      - name: Terraform plan
+        run: |
+          terraform -chdir=terraform plan -out=tfplan \
+            -var="aws_region=${AWS_REGION}" \
+            -var="project_name=${PROJECT_NAME}" \
+            -var="environment=${DEPLOY_ENVIRONMENT}" \
+            -var="allowed_ingress_cidr=${ALLOWED_INGRESS_CIDR}" \
+            -var="container_image=${{ steps.image.outputs.image_uri }}"
+
+      - name: Terraform apply
+        run: terraform -chdir=terraform apply -auto-approve tfplan
+
+      - name: Deployment outputs
+        run: terraform -chdir=terraform output
