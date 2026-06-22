@@ -46,7 +46,7 @@ flowchart TB
   ci -. optional deploy .-> terraform
 ```
 
-Architecture decisions are documented in [docs/adr](docs/adr/README.md), including local-only delivery, Postgres over SQLite, focused pattern scanning over a full HCL parser, and the API/CLI/SARIF interface split.
+Architecture decisions are documented in [docs/adr](docs/adr/README.md), including local-only delivery, Postgres over SQLite, focused pattern scanning over a full HCL parser, the API/CLI/SARIF interface split, and the normalized risk score model.
 
 ## Coding Agent And Model
 
@@ -68,6 +68,8 @@ Open:
 - Health check: http://localhost:8000/health
 
 The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
+
+Risk scores use a normalized weighted model: critical, high, medium, and low findings contribute different weights, and the result is normalized by files scanned and distinct affected resources. See [ADR 0005](docs/adr/0005-normalized-risk-score.md) for the scoring formula and tradeoffs.
 
 The default Compose configuration starts:
 

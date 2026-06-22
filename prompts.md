@@ -319,3 +319,11 @@ Rule metadata is duplicated: hardcoded check functions in scanner.py and a hand-
 ```
 
 Agent action: Extracted rule metadata and check functions into `app.scanner.RULES`, updated scanner findings, `/api/rules`, and SARIF rule metadata to read from the registry, and added tests to prevent metadata drift.
+
+## 2026-06-23 00:42 IST - Prompt 038 - Normalized Risk Score
+
+```text
+scanner.py is 100 - flat_penalties, floored at 0. Ten criticals score the same as four (both hit 0), and it ignores how many files/resources were scanned. Since you're already adding color thresholds (steer #4), the underlying number should mean something - consider normalizing per-resource or using a weighted, non-flooring model. Document the model in an ADR.
+```
+
+Agent action: Replaced the flat penalty score with a severity-weighted risk density normalized by files scanned and affected resources, updated scanner/API tests for the new score behavior, and documented the scoring model in an ADR.

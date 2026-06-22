@@ -24,7 +24,7 @@ def test_create_scan_persists_findings_and_history(client: TestClient) -> None:
     assert response.status_code == 200
     scan = response.json()
     assert scan["label"] == "JSON-only fixture scan"
-    assert scan["risk_score"] == 50
+    assert scan["risk_score"] == 60
     assert scan["files_scanned"] == 2
     assert scan["findings_count"] == 2
     assert [finding["rule_id"] for finding in scan["findings"]] == [
@@ -51,7 +51,7 @@ def test_sample_scan_endpoint_scans_all_sample_scenarios(client: TestClient) -> 
     assert scan["label"] == "Sample local IaC scan"
     assert scan["files_scanned"] == 10
     assert scan["findings_count"] == 55
-    assert scan["risk_score"] == 0
+    assert scan["risk_score"] == 52
 
 
 def test_scan_sarif_endpoint_exports_code_scanning_results(client: TestClient) -> None:
@@ -147,7 +147,7 @@ def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestCli
     assert scan["target_path"] == "uploaded: uploaded_bucket.tf, uploaded_security.json"
     assert scan["files_scanned"] == 2
     assert scan["findings_count"] == 2
-    assert scan["risk_score"] == 50
+    assert scan["risk_score"] == 60
     assert [finding["rule_id"] for finding in scan["findings"]] == [
         "OPEN_SSH_INGRESS",
         "S3_PUBLIC_ACL",

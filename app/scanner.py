@@ -8,6 +8,10 @@ from typing import Optional
 SUPPORTED_EXTENSIONS = {".tf", ".json", ".template", ".yaml", ".yml"}
 SSH_RECOMMENDATION = "Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern."
 S3_VERSIONING_RECOMMENDATION = "Enable S3 bucket versioning to improve recovery from accidental overwrite or deletion."
+SEVERITY_WEIGHTS = {"critical": 10, "high": 6, "medium": 3, "low": 1}
+FILE_SCOPE_WEIGHT = 2
+RESOURCE_SCOPE_WEIGHT = 1
+RISK_SCORE_DECAY = 4
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,7 @@ def scan_files(files: list[ScanInputFile], target_label: str) -> ScanResult:
         findings.extend(_scan_file(scan_file.file_path, scan_file.content))
 
     findings = sorted(findings, key=lambda finding: (severity_rank(finding.severity), finding.file_path))
-    risk_score = calculate_risk_score(findings)
+    risk_score = calculate_risk_score(findings, files_scanned=len(files))
     return ScanResult(
         target_path=target_label,
         files_scanned=len(files),
@@ -83,12 +87,22 @@ def scan_files(files: list[ScanInputFile], target_label: str) -> ScanResult:
     )
 
 
-def calculate_risk_score(findings: list[FindingCandidate]) -> int:
-    penalties = {"critical": 30, "high": 20, "medium": 10, "low": 5}
-    score = 100
-    for finding in findings:
-        score -= penalties.get(finding.severity.lower(), 5)
-    return max(score, 0)
+def calculate_risk_score(findings: list[FindingCandidate], files_scanned: int = 1) -> int:
+    if not findings:
+        return 100
+
+    weighted_risk = sum(SEVERITY_WEIGHTS.get(finding.severity.lower(), SEVERITY_WEIGHTS["low"]) for finding in findings)
+    scope_units = max(files_scanned, 1) * FILE_SCOPE_WEIGHT
+    scope_units += _affected_resource_count(findings) * RESOURCE_SCOPE_WEIGHT
+    numerator = 100 * RISK_SCORE_DECAY * scope_units
+    denominator = (RISK_SCORE_DECAY * scope_units) + weighted_risk
+    score = (numerator + denominator - 1) // denominator
+    return min(score, 99)
+
+
+def _affected_resource_count(findings: list[FindingCandidate]) -> int:
+    affected_resources = {(finding.file_path, finding.resource or finding.rule_id) for finding in findings}
+    return len(affected_resources)
 
 
 def severity_rank(severity: str) -> int:

@@ -1,9 +1,30 @@
 from collections import Counter
 from pathlib import Path
 
-from app.scanner import RULES, RULES_BY_ID, ScanInputFile, calculate_risk_score, scan_files, scan_path
+from app.scanner import (
+    RULES,
+    RULES_BY_ID,
+    FindingCandidate,
+    ScanInputFile,
+    calculate_risk_score,
+    scan_files,
+    scan_path,
+)
 
 SCENARIOS = Path("sample_iac/scenarios")
+
+
+def make_finding(severity: str, index: int, resource: str = "shared-resource") -> FindingCandidate:
+    return FindingCandidate(
+        rule_id=f"SYNTHETIC_{index}",
+        title=f"Synthetic {severity} finding",
+        severity=severity,
+        file_path="synthetic.tf",
+        line_number=index + 1,
+        resource=resource,
+        evidence="synthetic evidence",
+        recommendation="synthetic recommendation",
+    )
 
 
 def rule_counts(path: Path) -> Counter:
@@ -36,7 +57,7 @@ def test_both_risky_scenario_detects_terraform_and_json_findings() -> None:
         }
     )
     assert result.findings[0].rule_id == "OPEN_SSH_INGRESS"
-    assert result.risk_score == 40
+    assert result.risk_score == 60
 
 
 def test_terraform_only_scenario_detects_only_terraform_findings() -> None:
@@ -50,7 +71,7 @@ def test_terraform_only_scenario_detects_only_terraform_findings() -> None:
         }
     )
     assert {finding.file_path for finding in result.findings} == {"risky_terraform.tf"}
-    assert result.risk_score == 70
+    assert result.risk_score == 73
 
 
 def test_json_only_scenario_detects_only_json_findings() -> None:
@@ -69,7 +90,7 @@ def test_json_only_scenario_detects_only_json_findings() -> None:
         assert finding.title == rule.title
         assert finding.severity == rule.severity
         assert finding.recommendation == rule.recommendation
-    assert result.risk_score == 50
+    assert result.risk_score == 60
 
 
 def test_clean_scenario_has_full_score() -> None:
@@ -100,7 +121,7 @@ def test_large_violations_scenario_exercises_all_severity_categories() -> None:
             "S3_VERSIONING_DISABLED": 12,
         }
     )
-    assert result.risk_score == 0
+    assert result.risk_score == 47
 
 
 def test_all_sample_iac_scenarios_are_scanned_together() -> None:
@@ -116,7 +137,7 @@ def test_all_sample_iac_scenarios_are_scanned_together() -> None:
             "S3_VERSIONING_DISABLED": 12,
         }
     )
-    assert result.risk_score == 0
+    assert result.risk_score == 52
 
 
 def test_scan_files_supports_uploaded_in_memory_content() -> None:
@@ -141,12 +162,18 @@ resource "aws_security_group" "admin" {
 
     assert result.target_path == "uploaded: uploaded_security_group.tf"
     assert result.files_scanned == 1
-    assert result.risk_score == 70
+    assert result.risk_score == 55
     assert result.findings[0].rule_id == "OPEN_SSH_INGRESS"
 
 
-def test_risk_score_never_goes_below_zero() -> None:
-    result = scan_path(Path("sample_iac"))
-    overloaded_findings = result.findings * 10
+def test_risk_score_uses_weighted_density_without_zero_saturation() -> None:
+    four_critical_findings = [make_finding("critical", index) for index in range(4)]
+    ten_critical_findings = [make_finding("critical", index) for index in range(10)]
 
-    assert calculate_risk_score(overloaded_findings) == 0
+    four_critical_score = calculate_risk_score(four_critical_findings, files_scanned=1)
+    ten_critical_score = calculate_risk_score(ten_critical_findings, files_scanned=1)
+    broader_scope_score = calculate_risk_score(four_critical_findings, files_scanned=20)
+
+    assert calculate_risk_score([], files_scanned=20) == 100
+    assert 0 < ten_critical_score < four_critical_score < 100
+    assert broader_scope_score > four_critical_score
