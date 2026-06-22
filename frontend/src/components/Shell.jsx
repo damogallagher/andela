@@ -49,7 +49,7 @@ export const Layout = styled.main`
   gap: 18px;
 `;
 
-export function Shell({ onRunSample, sampleBusy, children }) {
+export function Shell({ onRunSample, sampleBusy, onExportSarif, exportBusy, canExportSarif, children }) {
   return (
     <>
       <Header>
@@ -61,6 +61,9 @@ export function Shell({ onRunSample, sampleBusy, children }) {
           <RunSampleButton type="button" onClick={onRunSample} disabled={sampleBusy}>
             {sampleBusy ? "Scanning..." : "Run Sample Scan"}
           </RunSampleButton>
+          <ExportSarifButton type="button" onClick={onExportSarif} disabled={!canExportSarif || exportBusy}>
+            {exportBusy ? "Exporting..." : "Export SARIF"}
+          </ExportSarifButton>
           <SecondaryLink href="/docs">API Docs</SecondaryLink>
         </Actions>
       </Header>
@@ -79,5 +82,18 @@ const RunSampleButton = styled.button`
   justify-content: center;
   color: #ffffff;
   background: ${theme.colors.teal};
+  font-weight: 800;
+`;
+
+const ExportSarifButton = styled.button`
+  min-height: 40px;
+  border: 1px solid ${theme.colors.teal};
+  border-radius: 6px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f3f3b;
+  background: ${theme.colors.tealSoft};
   font-weight: 800;
 `;

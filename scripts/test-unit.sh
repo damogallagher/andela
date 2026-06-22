@@ -11,5 +11,4 @@ else
   PYTHON="python3"
 fi
 
-"${PYTHON}" -m pytest tests/test_scanner.py "$@"
-
+"${PYTHON}" -m pytest tests/test_scanner.py tests/test_cli.py "$@"

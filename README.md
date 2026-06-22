@@ -36,7 +36,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
-The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
+The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
 
 The default Compose configuration starts:
 
@@ -109,6 +109,16 @@ curl -X POST http://localhost:8000/api/scans/upload \
   -F "files=@sample_iac/scenarios/json_only/risky_cloudformation.json"
 ```
 
+## Pipeline Guardrail CLI
+
+Run the scanner without starting the API or database:
+
+```bash
+python -m app.cli scan sample_iac/ --fail-on critical
+```
+
+The CLI exits `1` when any finding meets or exceeds the configured severity threshold. The CI workflow runs this command before Docker build, so critical findings block the build.
+
 ## Sample Infrastructure Fixtures
 
 The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-style files used by the scanner and tests:
@@ -142,7 +152,7 @@ Use the scripts directory to run linting and test scopes:
 ./scripts/test-all.sh
 ```
 
-The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner unit tests for each fixture scenario, FastAPI functional tests for scan creation, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, uploads, scan history, desktop history placement, and mobile-width usability.
+The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
 
 The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
 
@@ -159,6 +169,7 @@ It performs:
 - Playwright browser tests.
 - Terraform formatting and validation.
 - SARIF generation from a sample scan and upload to GitHub Code Scanning with `github/codeql-action/upload-sarif`.
+- Guardrail CLI scanning of `sample_iac/` with `--fail-on critical` before Docker build.
 - Docker image build.
 
 Dependabot is configured in `.github/dependabot.yml` to create one weekly grouped dependency update pull request against `dev`. The grouped PR covers npm, pip, Docker, Terraform, and GitHub Actions dependencies and is scheduled for Monday at 09:00 Europe/Dublin time.

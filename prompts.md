@@ -279,3 +279,27 @@ Right now findings only live in the dashboard. Real guardrail tools emit [SARIF]
 ```
 
 Agent action: Added a SARIF 2.1.0 export endpoint for persisted scans, updated API tests and README coverage, and configured GitHub Actions to generate sample scan SARIF and upload it to GitHub Code Scanning with `github/codeql-action/upload-sarif`.
+
+## 2026-06-23 00:28 IST - Prompt 033 - CLI Pipeline Guardrail
+
+```text
+The app is "API-first" but a guardrail auditor's primary job is failing a pipeline. Add python -m app.cli scan <path> --fail-on critical that exits non-zero when findings breach a threshold. This pairs directly with your GitHub Actions steer — the workflow runs the scanner against sample_iac/ and blocks the build on criticals.
+```
+
+Agent action: Added a DB-free scanner CLI with severity threshold exit codes, unit coverage for pass/fail/missing-path behavior, and a GitHub Actions guardrail job that blocks Docker build when `sample_iac/` contains critical findings.
+
+## 2026-06-23 00:29 IST - Prompt 034 - UI SARIF Export
+
+```text
+Can we add a sarif export from the UI
+```
+
+Agent action: Added an Export SARIF dashboard action for the selected scan, wired it to the SARIF API endpoint as a browser download, updated Playwright coverage for disabled and successful download states, and documented the UI export in README.
+
+## 2026-06-23 00:32 IST - Prompt 035 - Table Sort Arrow Indicators
+
+```text
+on the table, instead of Sort then A-Z, can we have an up and down arrow instead?
+```
+
+Agent action: Replaced visible table sort labels with neutral, ascending, and descending arrow indicators while preserving accessible sort button labels, and updated Playwright sorting coverage for the arrow states.

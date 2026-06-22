@@ -143,9 +143,9 @@ const SortButton = styled.button`
 
 const SortIndicator = styled.span`
   flex: 0 0 auto;
-  min-width: 34px;
+  min-width: 22px;
   color: ${({ $active }) => ($active ? theme.colors.teal : theme.colors.muted)};
-  font-size: 0.7rem;
+  font-size: 1rem;
   font-weight: 900;
   text-align: right;
 `;
@@ -386,8 +386,8 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
                         <Th key={column.key} aria-sort={ariaSort(column.key, sort)}>
                           <SortButton type="button" aria-label={`Sort by ${column.label}`} onClick={() => handleSort(column.key)}>
                             <span>{column.label}</span>
-                            <SortIndicator $active={sort?.key === column.key}>
-                              {sort?.key === column.key ? (sort.direction === "asc" ? "A-Z" : "Z-A") : "Sort"}
+                            <SortIndicator $active={sort?.key === column.key} aria-hidden="true">
+                              {sort?.key === column.key ? (sort.direction === "asc" ? "↑" : "↓") : "↕"}
                             </SortIndicator>
                           </SortButton>
                         </Th>

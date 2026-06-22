@@ -118,6 +118,29 @@ jobs:
           sarif_file: andela-guardrail-auditor.sarif
           category: andela-guardrail-auditor
 
+  guardrail-cli:
+    name: Guardrail CLI scan
+    runs-on: ubuntu-latest
+    needs:
+      - code-scanning
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Block build on critical guardrail findings
+        run: python -m app.cli scan sample_iac/ --fail-on critical
+
   frontend:
     name: UI lint, build, and Playwright
     runs-on: ubuntu-latest
@@ -178,6 +201,7 @@ jobs:
       - backend
       - frontend
       - terraform
+      - guardrail-cli
     steps:
       - name: Checkout
         uses: actions/checkout@v7

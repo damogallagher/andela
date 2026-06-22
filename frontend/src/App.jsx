@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import styled, { ThemeProvider } from "styled-components";
 
-import { listScans, runSampleScan } from "./api.js";
+import { exportScanSarif, listScans, runSampleScan } from "./api.js";
 import { FindingsTable } from "./components/FindingsTable.jsx";
 import { Layout, Shell } from "./components/Shell.jsx";
 import { RiskScorePanel } from "./components/RiskScorePanel.jsx";
@@ -28,6 +28,7 @@ export function App() {
   const [selectedSeverity, setSelectedSeverity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sampleBusy, setSampleBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState("");
   const selectedScan = scans.find((scan) => scan.id === selectedScanId) || scans[0] || null;
   const counts = useMemo(() => severityCounts(selectedScan), [selectedScan]);
@@ -70,6 +71,30 @@ export function App() {
     }
   }
 
+  async function handleExportSarif() {
+    if (!selectedScan) {
+      return;
+    }
+
+    setExportBusy(true);
+    setError("");
+    try {
+      const sarifBlob = await exportScanSarif(selectedScan.id);
+      const url = URL.createObjectURL(sarifBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `andela-scan-${selectedScan.id}.sarif`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   function handleScanCreated(scan) {
     setScans((current) => insertLatestScan(current, scan));
     setSelectedScanId(scan.id);
@@ -84,7 +109,13 @@ export function App() {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
-      <Shell onRunSample={handleRunSample} sampleBusy={sampleBusy}>
+      <Shell
+        onRunSample={handleRunSample}
+        sampleBusy={sampleBusy}
+        onExportSarif={handleExportSarif}
+        exportBusy={exportBusy}
+        canExportSarif={Boolean(selectedScan)}
+      >
         <Layout>
           {error ? <ErrorBanner role="alert">{error}</ErrorBanner> : null}
           {loading ? <LoadingBanner>Loading scans...</LoadingBanner> : null}

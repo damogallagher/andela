@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs/promises";
 
 import {
   expectNoFrontendErrors,
@@ -74,6 +75,58 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await expect(page.locator("tbody tr")).toHaveCount(1);
     await expect(page.locator("tbody tr").first()).toContainText("uploaded-risky.tf");
     await expect(page.locator('section[aria-labelledby="findings-title"]')).toContainText("2026-06-22 21:15");
+    expectNoFrontendErrors(frontendErrors);
+  });
+
+  test("exports the selected scan as SARIF", async ({ page }) => {
+    const frontendErrors = trackFrontendErrors(page);
+    const scan = sampleScan({
+      id: 707,
+      label: "Exportable sample scan",
+    });
+    const sarifPayload = {
+      version: "2.1.0",
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: "Andela Enterprise Security Guardrail Auditor",
+            },
+          },
+          results: [
+            {
+              ruleId: "OPEN_SSH_INGRESS",
+              level: "error",
+              message: {
+                text: "SSH exposed to the public internet",
+              },
+            },
+          ],
+        },
+      ],
+    };
+    await mockScanHistory(page, [scan]);
+    await page.route("**/api/scans/707/sarif", async (route) => {
+      expect(route.request().method()).toBe("GET");
+      expect(route.request().headers().accept).toContain("application/sarif+json");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/sarif+json",
+        body: JSON.stringify(sarifPayload),
+      });
+    });
+
+    await page.goto("/");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export SARIF" }).click();
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    const exportedSarif = JSON.parse(await fs.readFile(downloadPath, "utf-8"));
+
+    expect(download.suggestedFilename()).toBe("andela-scan-707.sarif");
+    expect(exportedSarif.version).toBe("2.1.0");
+    expect(exportedSarif.runs[0].tool.driver.name).toBe("Andela Enterprise Security Guardrail Auditor");
     expectNoFrontendErrors(frontendErrors);
   });
 
@@ -206,11 +259,13 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
 
     await page.goto("/");
 
+    await expect(page.getByRole("button", { name: "Sort by Rule" }).locator("span").last()).toHaveText("↕");
     await page.getByRole("button", { name: "Sort by Rule" }).click();
     await expect(page.locator("th").filter({ has: page.getByRole("button", { name: "Sort by Rule" }) })).toHaveAttribute(
       "aria-sort",
       "ascending",
     );
+    await expect(page.getByRole("button", { name: "Sort by Rule" }).locator("span").last()).toHaveText("↑");
     await expect(page.locator("tbody tr").first()).toContainText("Alpha versioning gap");
 
     await page.getByRole("button", { name: "Sort by Resource" }).click();
@@ -230,6 +285,7 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
       "aria-sort",
       "descending",
     );
+    await expect(page.getByRole("button", { name: "Sort by Severity" }).locator("span").last()).toHaveText("↓");
     await expect(page.locator("tbody tr").first()).toContainText("Alpha versioning gap");
     expectNoFrontendErrors(frontendErrors);
   });

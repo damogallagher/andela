@@ -18,6 +18,7 @@ test.describe("dashboard empty, loading, and API error states", () => {
     await expect(page.getByRole("heading", { name: "Enterprise Security Guardrail Auditor" })).toBeVisible();
     await expect(page.getByText("Local-only security scanner")).toBeVisible();
     await expect(page.getByRole("button", { name: "Run Sample Scan" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Export SARIF" })).toBeDisabled();
     await expect(page.getByRole("link", { name: "API Docs" })).toHaveAttribute("href", "/docs");
     await expect(page.getByRole("heading", { name: "No scan" })).toBeVisible();
     await expect(page.getByText("Run the sample scan to populate the dashboard.")).toBeVisible();
