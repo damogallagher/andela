@@ -17,6 +17,37 @@ Local development is intentionally Docker Compose based. Optional AWS deployment
 - Ruff and ESLint for backend and UI linting
 - Terraform and GitHub Actions for optional AWS deployment
 
+## Architecture
+
+The scanner core is shared by the FastAPI application, dashboard workflows, SARIF export, and the CI-focused CLI gate.
+
+```mermaid
+flowchart TB
+  reviewer["Candidate or reviewer"]
+  browser["React dashboard<br/>Upload, filter, history, SARIF download"]
+  api["FastAPI app<br/>REST scans, uploads, SARIF endpoint"]
+  cli["Pipeline CLI<br/>python -m app.cli scan"]
+  scanner["Scanner core<br/>Terraform text rules and JSON rules"]
+  db["Postgres<br/>scan runs and findings"]
+  files["Local IaC files<br/>sample_iac or uploaded files"]
+  ci["GitHub Actions<br/>lint, tests, SARIF upload, guardrail gate"]
+  codeScanning["GitHub Code Scanning<br/>Security tab and PR annotations"]
+  terraform["Terraform AWS artifacts<br/>ECS, RDS, ALB, ECR"]
+
+  reviewer --> browser
+  browser --> api
+  api --> scanner
+  api --> db
+  scanner --> files
+  ci --> cli
+  cli --> scanner
+  ci --> api
+  ci --> codeScanning
+  ci -. optional deploy .-> terraform
+```
+
+Architecture decisions are documented in [docs/adr](docs/adr/README.md), including local-only delivery, Postgres over SQLite, focused pattern scanning over a full HCL parser, and the API/CLI/SARIF interface split.
+
 ## Coding Agent And Model
 
 - Coding agent: OpenAI Codex, running in the Codex desktop app.
@@ -218,5 +249,6 @@ Include these artifacts in the final submission:
 - Tagle output summary: Connector - Foundation Operator
 - Public GitHub repository link
 - `prompts.md` audit log
+- Architecture decision records in `docs/adr/` and the README component diagram
 - AI-generated presentation deck, created after the code is complete
 - Cloud cleanup confirmation: no cloud resources were created from the local agent workspace; AWS deployment runs only through configured GitHub Actions and Terraform.

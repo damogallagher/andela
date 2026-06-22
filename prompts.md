@@ -303,3 +303,11 @@ on the table, instead of Sort then A-Z, can we have an up and down arrow instead
 ```
 
 Agent action: Replaced visible table sort labels with neutral, ascending, and descending arrow indicators while preserving accessible sort button labels, and updated Playwright sorting coverage for the arrow states.
+
+## 2026-06-23 00:35 IST - Prompt 036 - Architecture Decision Records And Diagram
+
+```text
+Architecture Decision Records + a diagram. SAs are judged on documented judgment. Add docs/adr/ (e.g. "why regex over a real HCL parser", "why Postgres over SQLite", "why local-only"). A C4 / component diagram in the README feeds straight into your required presentation deck.
+```
+
+Agent action: Added architecture decision records for local-only delivery, Postgres over SQLite, focused scanner patterns over a full HCL parser, and API/CLI/SARIF interfaces; added a README component diagram and linked the ADRs from the challenge submission notes.
