@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScanRequest(BaseModel):
@@ -9,6 +9,8 @@ class ScanRequest(BaseModel):
 
 
 class FindingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     rule_id: str
     title: str
@@ -19,11 +21,10 @@ class FindingResponse(BaseModel):
     evidence: str
     recommendation: str
 
-    class Config:
-        from_attributes = True
-
 
 class ScanResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     label: str
     target_path: str
@@ -32,7 +33,3 @@ class ScanResponse(BaseModel):
     findings_count: int
     created_at: datetime
     findings: list[FindingResponse] = []
-
-    class Config:
-        from_attributes = True
-

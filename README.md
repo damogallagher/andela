@@ -15,7 +15,7 @@ This project is intentionally local-only. It does not create AWS, Azure, or othe
 ## Coding Agent And Model
 
 - Coding agent: OpenAI Codex, running in the Codex desktop app.
-- Model used: GPT-5.
+- Model used: GPT-5.5
 - Workflow: the coding agent generated and edited the application code, maintained `prompts.md`, updated documentation, ran verification commands, and published the repository.
 
 ## Run Locally
@@ -57,6 +57,17 @@ curl -X POST http://localhost:8000/api/scans \
   -d '{"path":"sample_iac","label":"Sample IaC scan"}'
 ```
 
+## Sample Infrastructure Fixtures
+
+The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-style files used by the scanner and tests:
+
+- `both_risky`: Terraform and JSON files both contain risky patterns.
+- `terraform_only`: Terraform contains risky patterns; JSON is clean.
+- `json_only`: JSON contains risky patterns; Terraform is clean.
+- `clean`: Terraform and JSON files are both configured safely.
+
+The sample findings cover public SSH ingress, public S3 ACLs, wildcard IAM policies, and disabled database encryption.
+
 ## Run Tests
 
 ```bash
@@ -65,6 +76,8 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest
 ```
+
+The test suite includes scanner unit tests for each fixture scenario and FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard rendering, rules metadata, missing paths, and scan-root path safety.
 
 ## Challenge Submission Notes
 

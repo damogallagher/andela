@@ -70,3 +70,19 @@ Include details in the README on the coding agent used and the model used
 ```
 
 Agent action: Added README details for the coding agent, model, and AI-managed workflow.
+
+## 2026-06-22 - Prompt 008 - Expanded Sample IaC And Tests
+
+```text
+Can you add sample Terraform and JSON infrastructure files. Some show risky patterns in both, some in 1 set of files, others show good files. Use these files to generate unit tests and functional tests for the application
+```
+
+Agent action: Added Terraform and JSON sample scenarios for both-risky, Terraform-only, JSON-only, and clean infrastructure; expanded scanner unit tests; added FastAPI functional tests; and documented the fixture/test coverage in README.md.
+
+## 2026-06-22 - Prompt 009 - Verification Warning Cleanup
+
+```text
+Run the expanded test suite, clean up framework deprecation warnings found during verification, and keep prompts.md current.
+```
+
+Agent action: Migrated FastAPI startup to a lifespan handler, updated template rendering to the current signature, and replaced Pydantic class Config usage with ConfigDict.

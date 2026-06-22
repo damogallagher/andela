@@ -1,4 +1,6 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -14,18 +16,20 @@ from app.scanner import scan_path, severity_rank
 from app.schemas import ScanRequest, ScanResponse
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
 app = FastAPI(
     title="Andela Enterprise Security Guardrail Auditor",
     version="0.1.0",
     description="Local-only API-first IaC security scanner with Postgres-backed scan history.",
+    lifespan=lifespan,
 )
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-
-@app.on_event("startup")
-def startup() -> None:
-    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")
@@ -38,9 +42,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     latest_scan = _latest_scan(db)
     history = db.scalars(select(ScanRun).order_by(ScanRun.created_at.desc()).limit(8)).all()
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "latest_scan": latest_scan,
             "history": history,
             "severity_counts": _severity_counts(latest_scan.findings if latest_scan else []),
@@ -152,7 +156,7 @@ def _resolve_scan_target(raw_path: str) -> Path:
     return resolved
 
 
-def _latest_scan(db: Session) -> ScanRun | None:
+def _latest_scan(db: Session) -> Optional[ScanRun]:
     return db.scalar(
         select(ScanRun)
         .options(selectinload(ScanRun.findings))

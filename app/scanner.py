@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
+from typing import Optional
 
 
 SUPPORTED_EXTENSIONS = {".tf", ".json", ".template", ".yaml", ".yml"}
@@ -71,6 +73,11 @@ def _collect_files(target: Path) -> list[Path]:
 
 
 def _scan_file(file_path: str, content: str) -> list[FindingCandidate]:
+    if Path(file_path).suffix.lower() in {".json", ".template"}:
+        parsed_findings = _scan_json_file(file_path, content)
+        if parsed_findings is not None:
+            return parsed_findings
+
     checks = [
         _public_s3_acl,
         _open_ssh_ingress,
@@ -81,6 +88,172 @@ def _scan_file(file_path: str, content: str) -> list[FindingCandidate]:
     for check in checks:
         findings.extend(check(file_path, content))
     return findings
+
+
+def _scan_json_file(file_path: str, content: str) -> Optional[list[FindingCandidate]]:
+    try:
+        document = json.loads(content)
+    except json.JSONDecodeError:
+        return None
+
+    findings: list[FindingCandidate] = []
+    resources = document.get("Resources", {}) if isinstance(document, dict) else {}
+    if not isinstance(resources, dict):
+        return findings
+
+    for resource_name, resource in resources.items():
+        if not isinstance(resource, dict):
+            continue
+        resource_type = str(resource.get("Type", "Unknown"))
+        properties = resource.get("Properties", {})
+        if not isinstance(properties, dict):
+            properties = {}
+
+        findings.extend(_json_public_s3_acl(file_path, content, resource_name, resource_type, properties))
+        findings.extend(_json_open_ssh_ingress(file_path, content, resource_name, resource_type, properties))
+        findings.extend(_json_unencrypted_database(file_path, content, resource_name, resource_type, properties))
+        findings.extend(_json_wildcard_iam_policy(file_path, content, resource_name, resource_type, properties))
+
+    return findings
+
+
+def _json_public_s3_acl(
+    file_path: str,
+    content: str,
+    resource_name: str,
+    resource_type: str,
+    properties: dict,
+) -> list[FindingCandidate]:
+    access_control = str(properties.get("AccessControl", ""))
+    if resource_type != "AWS::S3::Bucket" or access_control not in {"PublicRead", "PublicReadWrite"}:
+        return []
+    return [
+        FindingCandidate(
+            rule_id="S3_PUBLIC_ACL",
+            title="Public S3 ACL detected",
+            severity="high",
+            file_path=file_path,
+            line_number=_json_key_line(content, "AccessControl"),
+            resource=f"{resource_type}.{resource_name}",
+            evidence=f'"AccessControl": "{access_control}"',
+            recommendation="Use private ACLs and enforce public access blocks for S3 buckets.",
+        )
+    ]
+
+
+def _json_open_ssh_ingress(
+    file_path: str,
+    content: str,
+    resource_name: str,
+    resource_type: str,
+    properties: dict,
+) -> list[FindingCandidate]:
+    if resource_type != "AWS::EC2::SecurityGroup":
+        return []
+
+    ingress_rules = properties.get("SecurityGroupIngress", [])
+    if isinstance(ingress_rules, dict):
+        ingress_rules = [ingress_rules]
+
+    findings: list[FindingCandidate] = []
+    for ingress_rule in ingress_rules:
+        if not isinstance(ingress_rule, dict):
+            continue
+        exposes_ssh = int(ingress_rule.get("FromPort", -1)) <= 22 <= int(ingress_rule.get("ToPort", -1))
+        world_open = ingress_rule.get("CidrIp") == "0.0.0.0/0" or ingress_rule.get("CidrIpv6") == "::/0"
+        if exposes_ssh and world_open:
+            findings.append(
+                FindingCandidate(
+                    rule_id="OPEN_SSH_INGRESS",
+                    title="SSH exposed to the public internet",
+                    severity="critical",
+                    file_path=file_path,
+                    line_number=_json_key_line(content, "SecurityGroupIngress"),
+                    resource=f"{resource_type}.{resource_name}",
+                    evidence=_compact(json.dumps(ingress_rule, sort_keys=True)),
+                    recommendation="Restrict SSH ingress to approved admin CIDR ranges or use a bastion or SSM access pattern.",
+                )
+            )
+    return findings
+
+
+def _json_unencrypted_database(
+    file_path: str,
+    content: str,
+    resource_name: str,
+    resource_type: str,
+    properties: dict,
+) -> list[FindingCandidate]:
+    if resource_type != "AWS::RDS::DBInstance" or properties.get("StorageEncrypted") is not False:
+        return []
+    return [
+        FindingCandidate(
+            rule_id="DATABASE_ENCRYPTION_DISABLED",
+            title="Database encryption disabled",
+            severity="medium",
+            file_path=file_path,
+            line_number=_json_key_line(content, "StorageEncrypted"),
+            resource=f"{resource_type}.{resource_name}",
+            evidence='"StorageEncrypted": false',
+            recommendation="Enable storage encryption for database resources before deployment.",
+        )
+    ]
+
+
+def _json_wildcard_iam_policy(
+    file_path: str,
+    content: str,
+    resource_name: str,
+    resource_type: str,
+    properties: dict,
+) -> list[FindingCandidate]:
+    policy_documents = _policy_documents(properties)
+    if not resource_type.startswith("AWS::IAM::") or not any(_policy_has_wildcards(policy) for policy in policy_documents):
+        return []
+    return [
+        FindingCandidate(
+            rule_id="IAM_WILDCARD_POLICY",
+            title="Wildcard IAM policy detected",
+            severity="high",
+            file_path=file_path,
+            line_number=_json_key_line(content, "PolicyDocument"),
+            resource=f"{resource_type}.{resource_name}",
+            evidence='"Action" and "Resource" both include "*"',
+            recommendation="Replace wildcard actions and resources with least-privilege permissions.",
+        )
+    ]
+
+
+def _policy_documents(properties: dict) -> list[dict]:
+    documents: list[dict] = []
+    direct = properties.get("PolicyDocument")
+    if isinstance(direct, dict):
+        documents.append(direct)
+
+    for policy in properties.get("Policies", []):
+        if isinstance(policy, dict) and isinstance(policy.get("PolicyDocument"), dict):
+            documents.append(policy["PolicyDocument"])
+    return documents
+
+
+def _policy_has_wildcards(policy_document: dict) -> bool:
+    statements = policy_document.get("Statement", [])
+    if isinstance(statements, dict):
+        statements = [statements]
+    for statement in statements:
+        if not isinstance(statement, dict):
+            continue
+        if _has_wildcard(statement.get("Action")) and _has_wildcard(statement.get("Resource")):
+            return True
+    return False
+
+
+def _has_wildcard(value) -> bool:
+    if value == "*":
+        return True
+    if isinstance(value, list):
+        return "*" in value
+    return False
 
 
 def _public_s3_acl(file_path: str, content: str) -> list[FindingCandidate]:
@@ -176,6 +349,13 @@ def _line_at(content: str, index: int) -> str:
     if line_end == -1:
         line_end = len(content)
     return content[line_start:line_end].strip()
+
+
+def _json_key_line(content: str, key: str) -> int:
+    match = re.search(rf'"{re.escape(key)}"\s*:', content)
+    if not match:
+        return 1
+    return _line_number(content, match.start())
 
 
 def _nearest_resource(content: str, index: int) -> str:
