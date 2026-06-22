@@ -128,6 +128,77 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     expectNoFrontendErrors(frontendErrors);
   });
 
+  test("sorts findings from the table headers", async ({ page }) => {
+    const frontendErrors = trackFrontendErrors(page);
+    await mockScanHistory(page, [
+      sampleScan({
+        findings_count: 3,
+        files_scanned: 3,
+        findings: [
+          {
+            id: 1,
+            severity: "high",
+            title: "Zeta wildcard policy",
+            resource: "resource-z",
+            file_path: "zeta.tf",
+            line_number: 22,
+            recommendation: "Use scoped permissions.",
+            evidence: "*",
+          },
+          {
+            id: 2,
+            severity: "low",
+            title: "Alpha versioning gap",
+            resource: "resource-a",
+            file_path: "alpha.tf",
+            line_number: 4,
+            recommendation: "Apply versioning.",
+            evidence: "Suspended",
+          },
+          {
+            id: 3,
+            severity: "critical",
+            title: "Middle SSH exposure",
+            resource: "resource-m",
+            file_path: "middle.tf",
+            line_number: 8,
+            recommendation: "Restrict SSH.",
+            evidence: "0.0.0.0/0",
+          },
+        ],
+      }),
+    ]);
+
+    await page.goto("/");
+
+    await page.getByRole("button", { name: "Sort by Rule" }).click();
+    await expect(page.locator("th").filter({ has: page.getByRole("button", { name: "Sort by Rule" }) })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await expect(page.locator("tbody tr").first()).toContainText("Alpha versioning gap");
+
+    await page.getByRole("button", { name: "Sort by Resource" }).click();
+    await expect(page.locator("tbody tr").first()).toContainText("resource-a");
+
+    await page.getByRole("button", { name: "Sort by File" }).click();
+    await expect(page.locator("tbody tr").first()).toContainText("alpha.tf:4");
+
+    await page.getByRole("button", { name: "Sort by Recommendation" }).click();
+    await expect(page.locator("tbody tr").first()).toContainText("Apply versioning.");
+
+    await page.getByRole("button", { name: "Sort by Severity" }).click();
+    await expect(page.locator("tbody tr").first()).toContainText("Middle SSH exposure");
+
+    await page.getByRole("button", { name: "Sort by Severity" }).click();
+    await expect(page.locator("th").filter({ has: page.getByRole("button", { name: "Sort by Severity" }) })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    await expect(page.locator("tbody tr").first()).toContainText("Alpha versioning gap");
+    expectNoFrontendErrors(frontendErrors);
+  });
+
   test("shows a run-sample error without replacing the existing dashboard", async ({ page }) => {
     const frontendErrors = trackFrontendErrors(page);
     await mockScanHistory(page, [sampleScan()]);

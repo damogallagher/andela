@@ -7,8 +7,13 @@ import { formatScanDateTime } from "../time.js";
 import { severityTheme, theme } from "../styles.js";
 
 const FindingsPanel = styled(Panel)`
-  grid-column: 1 / -1;
+  grid-column: span 9;
+  min-width: 0;
   padding: 24px;
+
+  @media (max-width: 1120px) {
+    grid-column: 1 / -1;
+  }
 `;
 
 const Timestamp = styled.span`
@@ -91,22 +96,58 @@ const Select = styled.select`
 `;
 
 const TableWrap = styled.div`
+  max-width: 100%;
   overflow-x: auto;
+  border: 1px solid #e5ecef;
+  border-radius: 8px;
+  background: #ffffff;
 `;
 
 const Table = styled.table`
   width: 100%;
-  min-width: 780px;
+  min-width: 1180px;
   border-collapse: collapse;
+  table-layout: fixed;
 `;
 
 const Th = styled.th`
-  padding: 12px 10px;
+  padding: 0;
   border-bottom: 1px solid #e5ecef;
   color: ${theme.colors.muted};
   font-size: 0.78rem;
   text-align: left;
   text-transform: uppercase;
+`;
+
+const SortButton = styled.button`
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  padding: 12px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: inherit;
+  background: transparent;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+
+  &:hover,
+  &:focus-visible {
+    background: ${theme.colors.tealSoft};
+    color: ${theme.colors.text};
+  }
+`;
+
+const SortIndicator = styled.span`
+  flex: 0 0 auto;
+  min-width: 34px;
+  color: ${({ $active }) => ($active ? theme.colors.teal : theme.colors.muted)};
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-align: right;
 `;
 
 const Td = styled.td`
@@ -116,6 +157,7 @@ const Td = styled.td`
   font-size: 0.92rem;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 `;
 
 const Badge = styled.span`
@@ -183,10 +225,57 @@ function searchableText(finding) {
   ].join(" ").toLowerCase();
 }
 
+const columns = [
+  { key: "severity", label: "Severity", width: "130px" },
+  { key: "title", label: "Rule", width: "190px" },
+  { key: "resource", label: "Resource", width: "290px" },
+  { key: "file", label: "File", width: "240px" },
+  { key: "recommendation", label: "Recommendation", width: "330px" },
+];
+
+const severityRank = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function sortValue(finding, key) {
+  if (key === "severity") {
+    return severityRank[finding.severity] ?? 99;
+  }
+  if (key === "file") {
+    return `${finding.file_path || ""}:${finding.line_number || ""}`.toLowerCase();
+  }
+  return String(finding[key] || "").toLowerCase();
+}
+
+function sortFindings(findings, sort) {
+  if (!sort) {
+    return findings;
+  }
+  return [...findings].sort((left, right) => {
+    const leftValue = sortValue(left, sort.key);
+    const rightValue = sortValue(right, sort.key);
+    const base = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true, sensitivity: "base" });
+    return sort.direction === "asc" ? base : -base;
+  });
+}
+
+function ariaSort(columnKey, sort) {
+  if (sort?.key !== columnKey) {
+    return "none";
+  }
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
 export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
   const [query, setQuery] = useState("");
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState(null);
   const findings = useMemo(() => scan?.findings || [], [scan]);
 
   const filteredFindings = useMemo(() => {
@@ -198,10 +287,11 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
     });
   }, [findings, query, selectedSeverity]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredFindings.length / pageSize));
+  const sortedFindings = useMemo(() => sortFindings(filteredFindings, sort), [filteredFindings, sort]);
+  const pageCount = Math.max(1, Math.ceil(sortedFindings.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleFindings = filteredFindings.slice(pageStart, pageStart + pageSize);
+  const visibleFindings = sortedFindings.slice(pageStart, pageStart + pageSize);
 
   function handleQueryChange(event) {
     setQuery(event.target.value);
@@ -210,6 +300,16 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
 
   function handlePageSizeChange(event) {
     setPageSize(Number(event.target.value));
+    setPage(1);
+  }
+
+  function handleSort(columnKey) {
+    setSort((current) => {
+      if (current?.key === columnKey) {
+        return { key: columnKey, direction: current.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key: columnKey, direction: "asc" };
+    });
     setPage(1);
   }
 
@@ -273,15 +373,25 @@ export function FindingsTable({ scan, selectedSeverity, onClearSeverity }) {
 
           {visibleFindings.length > 0 ? (
             <>
-              <TableWrap>
+              <TableWrap role="region" aria-label="Scrollable findings table" tabIndex="0">
                 <Table>
+                  <colgroup>
+                    {columns.map((column) => (
+                      <col key={column.key} style={{ width: column.width }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <Th>Severity</Th>
-                      <Th>Rule</Th>
-                      <Th>Resource</Th>
-                      <Th>File</Th>
-                      <Th>Recommendation</Th>
+                      {columns.map((column) => (
+                        <Th key={column.key} aria-sort={ariaSort(column.key, sort)}>
+                          <SortButton type="button" aria-label={`Sort by ${column.label}`} onClick={() => handleSort(column.key)}>
+                            <span>{column.label}</span>
+                            <SortIndicator $active={sort?.key === column.key}>
+                              {sort?.key === column.key ? (sort.direction === "asc" ? "A-Z" : "Z-A") : "Sort"}
+                            </SortIndicator>
+                          </SortButton>
+                        </Th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>

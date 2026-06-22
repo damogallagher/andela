@@ -42,7 +42,7 @@ const Actions = styled.nav`
 `;
 
 export const Layout = styled.main`
-  width: min(1440px, calc(100% - 24px));
+  width: min(1600px, calc(100% - 24px));
   margin: 28px auto 48px;
   display: grid;
   grid-template-columns: repeat(12, 1fr);

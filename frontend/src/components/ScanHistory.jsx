@@ -5,8 +5,14 @@ import { formatScanDateTime } from "../time.js";
 import { theme } from "../styles.js";
 
 const HistoryPanel = styled(Panel)`
-  grid-column: 1 / -1;
+  grid-column: span 3;
+  min-width: 0;
   padding: 24px;
+  align-self: start;
+
+  @media (max-width: 1120px) {
+    grid-column: 1 / -1;
+  }
 `;
 
 const HistoryList = styled.ol`
@@ -14,8 +20,12 @@ const HistoryList = styled.ol`
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
+
+  @media (max-width: 1120px) {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
 `;
 
 const HistoryItem = styled.li`

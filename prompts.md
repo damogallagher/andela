@@ -208,3 +208,11 @@ Update the docker-compose.yaml file, if the frontend react code changes, make su
 ```
 
 Agent action: Added a Docker Compose Vite frontend service with hot reload on port 5173, configured Docker-friendly API proxying, and documented the auto-refresh development workflow.
+
+## 2026-06-23 00:01 IST - Prompt 025 - Sortable Scrollable Findings Table
+
+```text
+Make the results table scrollable horizontally. Also let users sort on teh table headers. Move the recent scans to the right hand side of the screen.
+```
+
+Agent action: Made the findings table a horizontally scrollable region with fixed-width columns, added sortable table headers for all findings columns, moved recent scans into a desktop right-side history rail, and expanded Playwright coverage for sorting, table overflow, and desktop history placement.
