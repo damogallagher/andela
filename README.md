@@ -41,7 +41,7 @@ The dashboard supports severity color coding, a color-coded percentage score (gr
 The default Compose configuration starts:
 
 - `andela-app` on port `8000`
-- `andela-postgres` on port `5432`
+- `andela-postgres` running Postgres 17 on port `5432`
 - `andela-frontend` on port `5173` for Vite hot reload during React development
 
 ## Frontend Development

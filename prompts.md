@@ -240,3 +240,11 @@ Create a github action to run dependbot on the project. Create 1 PR weekly again
 ```
 
 Agent action: Added `.github/dependabot.yml` with a weekly multi-ecosystem Dependabot group targeting `dev`, consolidating npm, pip, Docker, Terraform, and GitHub Actions dependency updates into one scheduled pull request, and documented the behavior in README.
+
+## 2026-06-23 00:15 IST - Prompt 029 - Postgres 17 Compose Runtime
+
+```text
+update docker-compose.yaml to use postgres 17 instead of 16
+```
+
+Agent action: Updated the Docker Compose database service from `postgres:16-alpine` to `postgres:17-alpine` and documented the local Postgres 17 service in README.
