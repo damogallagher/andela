@@ -12,6 +12,12 @@ This project is intentionally local-only. It does not create AWS, Azure, or othe
 - Docker Compose for local app and database startup
 - Pytest for scanner tests
 
+## Coding Agent And Model
+
+- Coding agent: OpenAI Codex, running in the Codex desktop app.
+- Model used: GPT-5.
+- Workflow: the coding agent generated and edited the application code, maintained `prompts.md`, updated documentation, ran verification commands, and published the repository.
+
 ## Run Locally
 
 ```bash
@@ -69,4 +75,3 @@ Include these artifacts in the final submission:
 - `prompts.md` audit log
 - AI-generated presentation deck, created after the code is complete
 - Cloud cleanup confirmation: no cloud resources were created; this was a local-only Docker Compose build
-

@@ -62,3 +62,11 @@ Rerun tests after the severity ordering change, correct any failing behavior, an
 ```
 
 Agent action: Moved severity sorting to the full scan aggregation so findings are ordered correctly across all scanned files.
+
+## 2026-06-22 - Prompt 007 - README Agent And Model Details
+
+```text
+Include details in the README on the coding agent used and the model used
+```
+
+Agent action: Added README details for the coding agent, model, and AI-managed workflow.
