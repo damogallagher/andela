@@ -1,0 +1,46 @@
+version: 2
+
+multi-ecosystem-groups:
+  weekly-dependencies:
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Dublin"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "terraform"
+    directory: "/terraform"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"

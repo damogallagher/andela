@@ -232,3 +232,11 @@ create scripts in the scripts dir to run linting on the project
 ```
 
 Agent action: Added a project-level lint wrapper script in `scripts/lint-project.sh`, kept the backend/frontend lint scripts as the scoped lint entry points, and documented the lint commands in README.
+
+## 2026-06-23 00:12 IST - Prompt 028 - Weekly Dependabot Grouped PRs
+
+```text
+Create a github action to run dependbot on the project. Create 1 PR weekly against the dev branch
+```
+
+Agent action: Added `.github/dependabot.yml` with a weekly multi-ecosystem Dependabot group targeting `dev`, consolidating npm, pip, Docker, Terraform, and GitHub Actions dependency updates into one scheduled pull request, and documented the behavior in README.

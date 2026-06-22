@@ -150,6 +150,8 @@ It performs:
 - Terraform formatting and validation.
 - Docker image build.
 
+Dependabot is configured in `.github/dependabot.yml` to create one weekly grouped dependency update pull request against `dev`. The grouped PR covers npm, pip, Docker, Terraform, and GitHub Actions dependencies and is scheduled for Monday at 09:00 Europe/Dublin time.
+
 AWS deployment runs from the `dev` branch when the required repository variables are configured. The deploy job uses GitHub OIDC to assume an AWS role, initializes Terraform with an S3 backend, ensures the ECR repository exists, builds and pushes the Docker image, then applies the ECS/RDS/ALB infrastructure.
 
 Required GitHub repository variables for deployment:
