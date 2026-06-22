@@ -104,3 +104,11 @@ Update prompts.md and add the times the prompts were issues. Currently its only 
 ```
 
 Agent action: Added Europe/Dublin local issue times to every prompt heading and documented the source of backfilled times for earlier entries.
+
+## 2026-06-22 23:06 IST - Prompt 012 - Upload Scan API And Frontend
+
+```text
+Expand the api and frontend, allow the user to upload a file / files and then scan said files and show results on screen
+```
+
+Agent action: Added upload scanning support for one or more infrastructure files, expanded the dashboard with upload controls, and documented the upload API workflow.

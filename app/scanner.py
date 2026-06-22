@@ -28,22 +28,36 @@ class ScanResult:
     findings: list[FindingCandidate]
 
 
+@dataclass(frozen=True)
+class ScanInputFile:
+    file_path: str
+    content: str
+
+
 def scan_path(path: Path) -> ScanResult:
     target = path.resolve()
     if not target.exists():
         raise FileNotFoundError(f"Scan target does not exist: {target}")
 
-    files = _collect_files(target)
+    files = [
+        ScanInputFile(
+            file_path=str(file_path.relative_to(target if target.is_dir() else target.parent)),
+            content=file_path.read_text(encoding="utf-8", errors="ignore"),
+        )
+        for file_path in _collect_files(target)
+    ]
+    return scan_files(files, str(target))
+
+
+def scan_files(files: list[ScanInputFile], target_label: str) -> ScanResult:
     findings: list[FindingCandidate] = []
-    for file_path in files:
-        content = file_path.read_text(encoding="utf-8", errors="ignore")
-        relative_path = str(file_path.relative_to(target if target.is_dir() else target.parent))
-        findings.extend(_scan_file(relative_path, content))
+    for scan_file in files:
+        findings.extend(_scan_file(scan_file.file_path, scan_file.content))
 
     findings = sorted(findings, key=lambda finding: (severity_rank(finding.severity), finding.file_path))
     risk_score = calculate_risk_score(findings)
     return ScanResult(
-        target_path=str(target),
+        target_path=target_label,
         files_scanned=len(files),
         risk_score=risk_score,
         findings=findings,

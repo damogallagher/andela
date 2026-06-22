@@ -55,6 +55,34 @@
         </article>
       </section>
 
+      <section class="upload-panel" aria-labelledby="upload-title">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Upload scan</p>
+            <h2 id="upload-title">Scan Files</h2>
+          </div>
+        </div>
+        <form id="upload-form" class="upload-form">
+          <label>
+            <span>Scan label</span>
+            <input id="upload-label" name="label" type="text" value="Uploaded file scan" maxlength="120">
+          </label>
+          <label>
+            <span>Infrastructure files</span>
+            <input
+              id="upload-files"
+              name="files"
+              type="file"
+              accept=".tf,.json,.template,.yaml,.yml"
+              multiple
+              required
+            >
+          </label>
+          <button id="upload-submit" type="submit">Scan Upload</button>
+          <p id="upload-status" class="form-status" role="status"></p>
+        </form>
+      </section>
+
       <section class="findings" aria-labelledby="findings-title">
         <div class="section-header">
           <div>
@@ -131,7 +159,30 @@
         }
         window.location.reload();
       });
+
+      const uploadForm = document.querySelector("#upload-form");
+      const uploadButton = document.querySelector("#upload-submit");
+      const uploadStatus = document.querySelector("#upload-status");
+      uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(uploadForm);
+        uploadButton.disabled = true;
+        uploadButton.textContent = "Scanning...";
+        uploadStatus.textContent = "";
+        const response = await fetch("/api/scans/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          const payload = await response.json();
+          uploadStatus.textContent = payload.detail || "Upload scan failed.";
+          uploadButton.textContent = "Scan Upload";
+          uploadButton.disabled = false;
+          return;
+        }
+        uploadStatus.textContent = "Scan complete.";
+        window.location.reload();
+      });
     </script>
   </body>
 </html>
-

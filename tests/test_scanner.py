@@ -1,7 +1,7 @@
 from collections import Counter
 from pathlib import Path
 
-from app.scanner import calculate_risk_score, scan_path
+from app.scanner import ScanInputFile, calculate_risk_score, scan_files, scan_path
 
 
 SCENARIOS = Path("sample_iac/scenarios")
@@ -78,9 +78,34 @@ def test_all_sample_iac_scenarios_are_scanned_together() -> None:
     assert result.risk_score == 0
 
 
+def test_scan_files_supports_uploaded_in_memory_content() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="uploaded_security_group.tf",
+                content="""
+resource "aws_security_group" "admin" {
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+""",
+            )
+        ],
+        "uploaded: uploaded_security_group.tf",
+    )
+
+    assert result.target_path == "uploaded: uploaded_security_group.tf"
+    assert result.files_scanned == 1
+    assert result.risk_score == 70
+    assert result.findings[0].rule_id == "OPEN_SSH_INGRESS"
+
+
 def test_risk_score_never_goes_below_zero() -> None:
     result = scan_path(Path("sample_iac"))
     overloaded_findings = result.findings * 10
 
     assert calculate_risk_score(overloaded_findings) == 0
-

@@ -63,8 +63,74 @@ def test_dashboard_renders_latest_scan(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert "Enterprise Security Guardrail Auditor" in response.text
+    assert "Scan Files" in response.text
+    assert "/api/scans/upload" in response.text
     assert "Clean fixture scan" in response.text
     assert "100" in response.text
+
+
+def test_upload_scan_accepts_multiple_files_and_persists_results(client: TestClient) -> None:
+    terraform_content = (
+        'resource "aws_s3_bucket" "reports" {\n'
+        '  bucket = "andela-upload-demo"\n'
+        '  acl    = "public-read"\n'
+        '}\n'
+    )
+    json_content = """
+{
+  "Resources": {
+    "AdminSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    }
+  }
+}
+"""
+
+    response = client.post(
+        "/api/scans/upload",
+        data={"label": "Uploaded fixture scan"},
+        files=[
+            ("files", ("uploaded_bucket.tf", terraform_content, "text/plain")),
+            ("files", ("uploaded_security.json", json_content, "application/json")),
+        ],
+    )
+
+    assert response.status_code == 200
+    scan = response.json()
+    assert scan["label"] == "Uploaded fixture scan"
+    assert scan["target_path"] == "uploaded: uploaded_bucket.tf, uploaded_security.json"
+    assert scan["files_scanned"] == 2
+    assert scan["findings_count"] == 2
+    assert scan["risk_score"] == 50
+    assert [finding["rule_id"] for finding in scan["findings"]] == [
+        "OPEN_SSH_INGRESS",
+        "S3_PUBLIC_ACL",
+    ]
+
+    history_response = client.get("/api/scans")
+    assert history_response.status_code == 200
+    assert history_response.json()[0]["label"] == "Uploaded fixture scan"
+
+
+def test_upload_scan_rejects_unsupported_file_types(client: TestClient) -> None:
+    response = client.post(
+        "/api/scans/upload",
+        data={"label": "Unsupported upload"},
+        files=[("files", ("notes.txt", "not infrastructure", "text/plain"))],
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported upload type" in response.json()["detail"]
 
 
 def test_rules_endpoint_lists_supported_rules(client: TestClient) -> None:
@@ -91,4 +157,3 @@ def test_missing_scan_path_returns_404(client: TestClient) -> None:
     response = client.post("/api/scans", json={"path": "sample_iac/missing", "label": "Missing"})
 
     assert response.status_code == 404
-

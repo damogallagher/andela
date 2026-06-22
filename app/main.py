@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import Finding, ScanRun
-from app.scanner import scan_path, severity_rank
+from app.scanner import SUPPORTED_EXTENSIONS, ScanInputFile, ScanResult, scan_files, scan_path, severity_rank
 from app.schemas import ScanRequest, ScanResponse
 
 
@@ -61,6 +61,41 @@ def run_sample_scan(db: Session = Depends(get_db)) -> ScanRun:
 @app.post("/api/scans", response_model=ScanResponse)
 def run_scan(scan_request: ScanRequest, db: Session = Depends(get_db)) -> ScanRun:
     return _run_scan(scan_request, db)
+
+
+@app.post("/api/scans/upload", response_model=ScanResponse)
+async def upload_scan(
+    files: list[UploadFile] = File(...),
+    label: str = Form("Uploaded file scan"),
+    db: Session = Depends(get_db),
+) -> ScanRun:
+    if not files:
+        raise HTTPException(status_code=400, detail="Upload at least one infrastructure file.")
+
+    scan_files_input: list[ScanInputFile] = []
+    unsupported_files: list[str] = []
+    for upload in files:
+        filename = Path(upload.filename or "").name
+        if not filename:
+            raise HTTPException(status_code=400, detail="Every uploaded file must have a filename.")
+        if Path(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
+            unsupported_files.append(filename)
+            continue
+        content = (await upload.read()).decode("utf-8", errors="ignore")
+        scan_files_input.append(ScanInputFile(file_path=filename, content=content))
+
+    if unsupported_files:
+        supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported upload type for: {', '.join(unsupported_files)}. Supported extensions: {supported}.",
+        )
+    if not scan_files_input:
+        raise HTTPException(status_code=400, detail="Upload at least one supported infrastructure file.")
+
+    target_label = "uploaded: " + ", ".join(scan_file.file_path for scan_file in scan_files_input)
+    result = scan_files(scan_files_input, target_label)
+    return _persist_scan(label, result, db)
 
 
 @app.get("/api/scans", response_model=list[ScanResponse])
@@ -119,9 +154,12 @@ def _run_scan(scan_request: ScanRequest, db: Session) -> ScanRun:
         result = scan_path(target_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _persist_scan(scan_request.label, result, db)
 
+
+def _persist_scan(label: str, result: ScanResult, db: Session) -> ScanRun:
     scan = ScanRun(
-        label=scan_request.label,
+        label=label,
         target_path=result.target_path,
         risk_score=result.risk_score,
         files_scanned=result.files_scanned,

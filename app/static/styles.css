@@ -95,6 +95,7 @@ button:disabled {
 
 .score-panel,
 .metrics article,
+.upload-panel,
 .findings,
 .history {
   border: 1px solid #dce4e8;
@@ -162,6 +163,48 @@ button:disabled {
 .metrics strong {
   font-size: 3rem;
   line-height: 1;
+}
+
+.upload-panel {
+  grid-column: 1 / -1;
+  padding: 24px;
+}
+
+.upload-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr) auto;
+  align-items: end;
+  gap: 14px;
+}
+
+.upload-form label {
+  display: grid;
+  gap: 7px;
+  color: #526879;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.upload-form input[type="text"],
+.upload-form input[type="file"] {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid #c9d6dc;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #18212f;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 500;
+}
+
+.form-status {
+  grid-column: 1 / -1;
+  min-height: 20px;
+  margin-bottom: 0;
+  color: #8a3b12;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .findings {
@@ -269,6 +312,7 @@ th {
 
   .score-panel,
   .metrics,
+  .upload-panel,
   .findings,
   .history {
     grid-column: 1 / -1;
@@ -277,6 +321,10 @@ th {
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .upload-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -284,4 +332,3 @@ th {
     grid-template-columns: 1fr;
   }
 }
-

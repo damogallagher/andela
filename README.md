@@ -57,6 +57,15 @@ curl -X POST http://localhost:8000/api/scans \
   -d '{"path":"sample_iac","label":"Sample IaC scan"}'
 ```
 
+Upload one or more infrastructure files and scan them without writing them to disk:
+
+```bash
+curl -X POST http://localhost:8000/api/scans/upload \
+  -F "label=Uploaded IaC scan" \
+  -F "files=@sample_iac/scenarios/both_risky/terraform/main.tf" \
+  -F "files=@sample_iac/scenarios/json_only/risky_cloudformation.json"
+```
+
 ## Sample Infrastructure Fixtures
 
 The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-style files used by the scanner and tests:
