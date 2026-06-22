@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import settings
 from app.database import Base, engine, get_db
 from app.models import Finding, ScanRun
+from app.sarif import build_sarif
 from app.scanner import SUPPORTED_EXTENSIONS, ScanInputFile, ScanResult, scan_files, scan_path, severity_rank
 from app.schemas import ScanRequest, ScanResponse
 
@@ -110,6 +111,12 @@ def get_scan(scan_id: int, db: Session = Depends(get_db)) -> ScanRun:
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan
+
+
+@app.get("/api/scans/{scan_id}/sarif")
+def get_scan_sarif(scan_id: int, db: Session = Depends(get_db)) -> JSONResponse:
+    scan = get_scan(scan_id, db)
+    return JSONResponse(content=build_sarif(scan), media_type="application/sarif+json")
 
 
 @app.get("/api/rules")

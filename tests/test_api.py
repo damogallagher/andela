@@ -53,6 +53,41 @@ def test_sample_scan_endpoint_scans_all_sample_scenarios(client: TestClient) -> 
     assert scan["risk_score"] == 0
 
 
+def test_scan_sarif_endpoint_exports_code_scanning_results(client: TestClient) -> None:
+    scan_response = client.post(
+        "/api/scans",
+        json={"path": "sample_iac/scenarios/json_only", "label": "JSON-only fixture scan"},
+    )
+    scan = scan_response.json()
+
+    response = client.get(f"/api/scans/{scan['id']}/sarif")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/sarif+json")
+    sarif = response.json()
+    assert sarif["version"] == "2.1.0"
+    assert sarif["$schema"] == "https://json.schemastore.org/sarif-2.1.0.json"
+
+    run = sarif["runs"][0]
+    assert run["tool"]["driver"]["name"] == "Andela Enterprise Security Guardrail Auditor"
+    assert {rule["id"] for rule in run["tool"]["driver"]["rules"]} == {
+        "IAM_WILDCARD_POLICY",
+        "OPEN_SSH_INGRESS",
+    }
+    assert run["invocations"][0]["executionSuccessful"] is True
+    assert run["invocations"][0]["properties"]["scanId"] == scan["id"]
+
+    results = run["results"]
+    assert len(results) == 2
+    assert {result["ruleId"] for result in results} == {"IAM_WILDCARD_POLICY", "OPEN_SSH_INGRESS"}
+    assert {result["level"] for result in results} == {"error"}
+    for result in results:
+        location = result["locations"][0]["physicalLocation"]
+        assert location["artifactLocation"]["uri"].startswith("sample_iac/scenarios/json_only/")
+        assert location["region"]["startLine"] > 0
+        assert result["partialFingerprints"]["primaryLocationLineHash"]
+
+
 def test_dashboard_renders_latest_scan(client: TestClient) -> None:
     client.post(
         "/api/scans",
@@ -155,3 +190,10 @@ def test_missing_scan_path_returns_404(client: TestClient) -> None:
     response = client.post("/api/scans", json={"path": "sample_iac/missing", "label": "Missing"})
 
     assert response.status_code == 404
+
+
+def test_missing_scan_sarif_returns_404(client: TestClient) -> None:
+    response = client.get("/api/scans/999/sarif")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Scan not found"

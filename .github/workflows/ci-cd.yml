@@ -58,6 +58,66 @@ jobs:
       - name: Run functional tests
         run: ./scripts/test-functional.sh
 
+  code-scanning:
+    name: Generate and upload SARIF
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Generate sample SARIF
+        env:
+          APP_SCAN_ROOT: ${{ github.workspace }}
+          DATABASE_URL: sqlite+pysqlite:///${{ github.workspace }}/sarif-ci.db
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from fastapi.testclient import TestClient
+
+          from app.database import Base, engine
+          from app.main import app
+
+          Base.metadata.drop_all(bind=engine)
+          Base.metadata.create_all(bind=engine)
+
+          with TestClient(app) as client:
+              scan_response = client.post("/api/scans/sample")
+              scan_response.raise_for_status()
+              scan_id = scan_response.json()["id"]
+              sarif_response = client.get(f"/api/scans/{scan_id}/sarif")
+              sarif_response.raise_for_status()
+
+          sarif_path = Path("andela-guardrail-auditor.sarif")
+          sarif_path.write_text(json.dumps(sarif_response.json(), indent=2), encoding="utf-8")
+          PY
+
+      - name: Upload SARIF
+        if: >
+          github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: andela-guardrail-auditor.sarif
+          category: andela-guardrail-auditor
+
   frontend:
     name: UI lint, build, and Playwright
     runs-on: ubuntu-latest

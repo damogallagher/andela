@@ -271,3 +271,11 @@ The attached docker-compose output shows Postgres 17 failing to start because th
 ```
 
 Agent action: Updated Docker Compose to use a new `postgres17-data` volume for Postgres 17, preserving the old Postgres 16 `postgres-data` volume, and documented the local volume migration note in README.
+
+## 2026-06-23 00:25 IST - Prompt 032 - SARIF Export And Code Scanning Upload
+
+```text
+Right now findings only live in the dashboard. Real guardrail tools emit [SARIF](https://sariftools.github.io/) so results show up in the GitHub Security tab and PR annotations. Add a GET /api/scans/{id}/sarif endpoint and have your CI upload it via github/codeql-action/upload-sarif
+```
+
+Agent action: Added a SARIF 2.1.0 export endpoint for persisted scans, updated API tests and README coverage, and configured GitHub Actions to generate sample scan SARIF and upload it to GitHub Code Scanning with `github/codeql-action/upload-sarif`.

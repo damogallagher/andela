@@ -84,6 +84,14 @@ List scan history:
 curl http://localhost:8000/api/scans
 ```
 
+Export a persisted scan as SARIF 2.1.0 for GitHub Code Scanning:
+
+```bash
+curl http://localhost:8000/api/scans/1/sarif \
+  -H "Accept: application/sarif+json" \
+  -o andela-guardrail-auditor.sarif
+```
+
 Scan a path under the configured local scan root:
 
 ```bash
@@ -134,7 +142,7 @@ Use the scripts directory to run linting and test scopes:
 ./scripts/test-all.sh
 ```
 
-The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner unit tests for each fixture scenario, FastAPI functional tests for scan creation, scan history, scan detail lookup, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, uploads, scan history, desktop history placement, and mobile-width usability.
+The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner unit tests for each fixture scenario, FastAPI functional tests for scan creation, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, uploads, scan history, desktop history placement, and mobile-width usability.
 
 The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
 
@@ -150,6 +158,7 @@ It performs:
 - React production build.
 - Playwright browser tests.
 - Terraform formatting and validation.
+- SARIF generation from a sample scan and upload to GitHub Code Scanning with `github/codeql-action/upload-sarif`.
 - Docker image build.
 
 Dependabot is configured in `.github/dependabot.yml` to create one weekly grouped dependency update pull request against `dev`. The grouped PR covers npm, pip, Docker, Terraform, and GitHub Actions dependencies and is scheduled for Monday at 09:00 Europe/Dublin time.
