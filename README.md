@@ -11,6 +11,7 @@ Local development is intentionally Docker Compose based. Optional AWS deployment
 - styled-components for component-scoped styling
 - Postgres for scan history and findings
 - SQLAlchemy for persistence
+- Alembic for database schema migrations
 - Docker Compose for local app and database startup
 - Pytest for scanner tests
 - Playwright for frontend browser tests
@@ -76,6 +77,8 @@ The default Compose configuration starts:
 - `andela-app` on port `8000`
 - `andela-postgres` running Postgres 17 on port `5432`
 - `andela-frontend` on port `5173` for Vite hot reload during React development
+
+The API runs Alembic migrations on startup, so local Docker Compose and CI use the versioned schema in `alembic/versions` instead of `Base.metadata.create_all`.
 
 Postgres 17 uses the `postgres17-data` Docker volume. If you previously ran the project with Postgres 16, the old `postgres-data` volume is left untouched because Postgres data directories are not major-version compatible in place. Once you no longer need old local scan history, remove that old volume manually with `docker volume rm andela_postgres-data`.
 

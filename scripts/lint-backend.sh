@@ -11,5 +11,5 @@ else
   PYTHON="python3"
 fi
 
-"${PYTHON}" -m ruff check app tests
-"${PYTHON}" -m compileall -q app tests
+"${PYTHON}" -m ruff check app tests alembic
+"${PYTHON}" -m compileall -q app tests alembic

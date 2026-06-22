@@ -327,3 +327,11 @@ scanner.py is 100 - flat_penalties, floored at 0. Ten criticals score the same a
 ```
 
 Agent action: Replaced the flat penalty score with a severity-weighted risk density normalized by files scanned and affected resources, updated scanner/API tests for the new score behavior, and documented the scoring model in an ADR.
+
+## 2026-06-23 00:45 IST - Prompt 039 - Alembic Migrations
+
+```text
+Alembic migrations instead of Base.metadata.create_all. Shows you think about schema evolution in production, not just first-run table creation.
+```
+
+Agent action: Added Alembic configuration and an initial scan-history schema migration, replaced app/test/CI direct metadata table creation with migration execution, added Alembic files to backend lint coverage, and documented the schema migration path in README.

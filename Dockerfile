@@ -19,6 +19,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY alembic.ini .
+COPY alembic ./alembic
 COPY --from=frontend-build /build/app/static/frontend ./app/static/frontend
 COPY sample_iac ./sample_iac
 

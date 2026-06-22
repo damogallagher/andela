@@ -1,18 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.database import Base, engine
 from app.main import app
+from app.migrations import reset_database
 from app.scanner import RULES, RULES_BY_ID
 
 
 @pytest.fixture()
 def client() -> TestClient:
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    reset_database()
     with TestClient(app) as test_client:
         yield test_client
-    Base.metadata.drop_all(bind=engine)
+    reset_database()
 
 
 def test_create_scan_persists_findings_and_history(client: TestClient) -> None:

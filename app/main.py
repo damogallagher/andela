@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
-from app.database import Base, engine, get_db
+from app.database import get_db
+from app.migrations import run_migrations
 from app.models import Finding, ScanRun
 from app.sarif import build_sarif
 from app.scanner import (
@@ -25,7 +26,7 @@ from app.schemas import ScanRequest, ScanResponse
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    run_migrations()
     yield
 
 
