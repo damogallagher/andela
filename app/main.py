@@ -5,7 +5,8 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
@@ -43,8 +44,12 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    try:
+        db.execute(text("SELECT 1")).scalar_one()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Database health check failed") from exc
+    return {"status": "ok", "database": "ok"}
 
 
 @app.get("/", response_class=HTMLResponse)

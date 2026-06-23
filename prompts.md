@@ -359,3 +359,11 @@ create a github action to deploy the terraform to aws
 ```
 
 Agent action: Added a dedicated manual `Deploy Terraform AWS` workflow that configures AWS OIDC, initializes Terraform with the S3 backend, validates, plans, optionally applies, and documents required variables and container image input.
+
+## 2026-06-23 01:08 IST - Prompt 043 - DB-Aware Health Check
+
+```text
+DB-aware health check — /health returns ok even if Postgres is down; add a SELECT 1.
+```
+
+Agent action: Updated `/health` to execute `SELECT 1` through the configured database session, return database status on success, and report service unavailable when the database check fails.

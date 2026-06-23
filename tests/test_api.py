@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.database import get_db
 from app.main import app
 from app.migrations import reset_database
 from app.scanner import RULES, RULES_BY_ID
@@ -12,6 +14,31 @@ def client() -> TestClient:
     with TestClient(app) as test_client:
         yield test_client
     reset_database()
+
+
+def test_health_checks_database(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "database": "ok"}
+
+
+def test_health_returns_unavailable_when_database_check_fails(client: TestClient) -> None:
+    class FailingDatabase:
+        def execute(self, _: object) -> None:
+            raise SQLAlchemyError("database unavailable")
+
+    def failing_db():
+        yield FailingDatabase()
+
+    app.dependency_overrides[get_db] = failing_db
+    try:
+        response = client.get("/health")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Database health check failed"
 
 
 def test_create_scan_persists_findings_and_history(client: TestClient) -> None:

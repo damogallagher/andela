@@ -66,7 +66,7 @@ Open:
 - Dashboard: http://localhost:8000
 - React dev dashboard with auto-refresh: http://localhost:5173/static/frontend/
 - API docs: http://localhost:8000/docs
-- Health check: http://localhost:8000/health
+- DB-aware health check: http://localhost:8000/health
 
 The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), risk-score-over-time trend, scan-to-scan regression comparison, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
 
