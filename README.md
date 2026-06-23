@@ -191,12 +191,12 @@ Secret findings redact evidence before persistence, dashboard display, CLI outpu
 ## Run Tests
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-lock.txt
 ```
 
-`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full transitive Python dependency graph used by local verification and CI.
+`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full Python 3.12 transitive dependency graph used by CI and exact local verification. If your machine only has the macOS system Python 3.9, install `requirements-dev.txt` for local development or install Python 3.12 for CI parity.
 
 Use the scripts directory to run linting and test scopes:
 

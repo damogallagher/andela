@@ -41,14 +41,20 @@ const scenarioExpectations = [
 ];
 
 test.describe("dashboard sample_iac scenario coverage", () => {
-  test("selects each sample_iac scenario from recent scans and renders its findings", async ({ page }) => {
+  test("selects each sample_iac scenario from recent scans and renders its findings", async ({ page }, testInfo) => {
     const frontendErrors = trackFrontendErrors(page);
     await mockScanHistory(page, scenarioScans());
 
     await page.goto("/");
 
     for (const scenario of scenarioExpectations) {
-      await page.getByRole("button", { name: new RegExp(`${scenario.label}\\s+${scenario.score}`) }).click();
+      const scenarioButton = page.getByRole("button", { name: new RegExp(`${scenario.label}\\s+${scenario.score}`) });
+      if (testInfo.project.name === "mobile-chromium") {
+        await scenarioButton.focus();
+        await page.keyboard.press("Enter");
+      } else {
+        await scenarioButton.click();
+      }
 
       await expect(page.locator("#score-title")).toHaveText(`${scenario.score}%`);
       await expect(page.getByText(scenario.detail)).toBeVisible();

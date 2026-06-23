@@ -418,7 +418,7 @@ Agent action: Clarified that `http://localhost:8000/` is the normal app URL and 
 Pin dependencies / lockfile for Python (requirements*.txt aren't pinned the way package-lock.json is) — relevant since you're adding Dependabot.
 ```
 
-Agent action: Added `requirements-lock.txt` from a clean install of the dev requirements, switched GitHub Actions Python dependency installation to the lockfile, and documented that local verification and CI use the locked transitive dependency set.
+Agent action: Added `requirements-lock.txt` from a clean Python 3.12 install of the dev requirements, switched GitHub Actions Python dependency installation to the lockfile, and documented Python 3.12 as the exact local verification path.
 
 ## 2026-06-23 01:23 IST - Prompt 050 - Expanded AWS And Azure Scanner Catalog
 
