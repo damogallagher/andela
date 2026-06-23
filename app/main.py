@@ -2,7 +2,7 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
@@ -26,6 +26,7 @@ from app.scanner import (
 from app.schemas import FindingResponse, ScanComparisonResponse, ScanRequest, ScanResponse, ScanSummary, SeverityDelta
 
 SEVERITIES = ("critical", "high", "medium", "low")
+UPLOAD_READ_CHUNK_BYTES = 64 * 1024
 
 
 @asynccontextmanager
@@ -79,6 +80,12 @@ async def upload_scan(
 ) -> ScanRun:
     if not files:
         raise HTTPException(status_code=400, detail="Upload at least one infrastructure file.")
+    if len(files) > settings.upload_max_files:
+        file_label = "file" if settings.upload_max_files == 1 else "files"
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Upload at most {settings.upload_max_files} {file_label} per scan.",
+        )
 
     scan_files_input: list[ScanInputFile] = []
     unsupported_files: list[str] = []
@@ -89,7 +96,7 @@ async def upload_scan(
         if Path(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
             unsupported_files.append(filename)
             continue
-        content = (await upload.read()).decode("utf-8", errors="ignore")
+        content = await _read_upload_content(upload, filename)
         scan_files_input.append(ScanInputFile(file_path=filename, content=content))
 
     if unsupported_files:
@@ -104,6 +111,22 @@ async def upload_scan(
     target_label = "uploaded: " + ", ".join(scan_file.file_path for scan_file in scan_files_input)
     result = scan_files(scan_files_input, target_label)
     return _persist_scan(label, result, db)
+
+
+async def _read_upload_content(upload: UploadFile, filename: str) -> str:
+    chunks: list[bytes] = []
+    bytes_read = 0
+
+    while chunk := await upload.read(UPLOAD_READ_CHUNK_BYTES):
+        bytes_read += len(chunk)
+        if bytes_read > settings.upload_max_file_size_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded file '{filename}' exceeds the {settings.upload_max_file_size_bytes} byte limit.",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks).decode("utf-8", errors="ignore")
 
 
 @app.get("/api/scans", response_model=list[ScanResponse])

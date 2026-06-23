@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.config import settings
 from app.database import get_db
 from app.main import app
 from app.migrations import reset_database
@@ -276,6 +277,37 @@ def test_upload_scan_rejects_unsupported_file_types(client: TestClient) -> None:
 
     assert response.status_code == 400
     assert "Unsupported upload type" in response.json()["detail"]
+
+
+def test_upload_scan_rejects_too_many_files(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "upload_max_files", 1)
+
+    response = client.post(
+        "/api/scans/upload",
+        data={"label": "Too many files"},
+        files=[
+            ("files", ("one.tf", 'resource "null_resource" "one" {}\n', "text/plain")),
+            ("files", ("two.tf", 'resource "null_resource" "two" {}\n', "text/plain")),
+        ],
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Upload at most 1 file per scan."
+    assert client.get("/api/scans").json() == []
+
+
+def test_upload_scan_rejects_oversized_file(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "upload_max_file_size_bytes", 8)
+
+    response = client.post(
+        "/api/scans/upload",
+        data={"label": "Oversized file"},
+        files=[("files", ("oversized.tf", "012345678", "text/plain"))],
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Uploaded file 'oversized.tf' exceeds the 8 byte limit."
+    assert client.get("/api/scans").json() == []
 
 
 def test_rules_endpoint_lists_supported_rules(client: TestClient) -> None:

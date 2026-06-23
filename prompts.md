@@ -367,3 +367,11 @@ DB-aware health check — /health returns ok even if Postgres is down; add a SEL
 ```
 
 Agent action: Updated `/health` to execute `SELECT 1` through the configured database session, return database status on success, and report service unavailable when the database check fails.
+
+## 2026-06-23 01:09 IST - Prompt 044 - Upload Limits
+
+```text
+Upload limits — ../../Personal/andela/app/main.py does await upload.read() with no size cap → trivial memory-exhaustion DoS. Cap file size and count.
+```
+
+Agent action: Added configurable upload count and per-file byte limits, replaced unbounded upload reads with chunked reads that stop at the configured cap, documented the defaults, and added functional tests for count and file-size rejection.

@@ -151,6 +151,8 @@ curl -X POST http://localhost:8000/api/scans/upload \
   -F "files=@sample_iac/scenarios/json_only/risky_cloudformation.json"
 ```
 
+Uploads are capped at 10 files per scan and 1 MiB per file by default. Override those defaults with `UPLOAD_MAX_FILES` and `UPLOAD_MAX_FILE_SIZE_BYTES` when running the app.
+
 ## Pipeline Guardrail CLI
 
 Run the scanner without starting the API or database:
