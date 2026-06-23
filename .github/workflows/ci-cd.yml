@@ -164,8 +164,19 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements-dev.txt
 
+      - name: Verify risky fixtures fail on critical guardrail findings
+        run: |
+          set +e
+          python -m app.cli scan sample_iac/ --fail-on critical
+          status="$?"
+          set -e
+          if [ "$status" -ne 1 ]; then
+            echo "Expected risky sample_iac fixtures to fail with critical findings, got exit code ${status}."
+            exit 1
+          fi
+
       - name: Block build on critical guardrail findings
-        run: python -m app.cli scan sample_iac/ --fail-on critical
+        run: python -m app.cli scan sample_iac/scenarios/clean --fail-on critical
 
   frontend:
     name: UI lint, build, and Playwright

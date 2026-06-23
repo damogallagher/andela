@@ -443,3 +443,11 @@ lcoal issue is resolved - remvoe SQLIte
 ```
 
 Agent action: Removed SQLite runtime, test, and CI paths; added a dedicated Postgres test database bootstrap script; updated functional tests and GitHub Actions to use Postgres services; documented the Postgres-only test setup; and moved local Postgres passwords out of committed Compose, settings, test, and README defaults.
+
+## 2026-06-23 01:37 IST - Prompt 053 - GitGuardian Incident Cleanup
+
+```text
+Fix githuardian issues: https://dashboard.gitguardian.com/workspace/565460/incidents/34194867?sort_published_at=true
+```
+
+Agent action: Verified the current tracked source no longer contains the hardcoded Postgres password patterns, kept the local password in untracked `.env` flow, and adjusted the CI guardrail job so risky fixtures prove CLI failure behavior while the blocking gate scans the clean fixture.
