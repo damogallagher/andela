@@ -25,8 +25,8 @@ The scanner core is shared by the FastAPI application, dashboard workflows, SARI
 ```mermaid
 flowchart TB
   reviewer["Candidate or reviewer"]
-  browser["React dashboard<br/>Upload, filter, history, SARIF download"]
-  api["FastAPI app<br/>REST scans, uploads, SARIF endpoint"]
+  browser["React dashboard<br/>Upload, filter, history, trend, comparison, SARIF download"]
+  api["FastAPI app<br/>REST scans, uploads, comparison, SARIF endpoint"]
   cli["Pipeline CLI<br/>python -m app.cli scan"]
   scanner["Scanner core<br/>Terraform text rules and JSON rules"]
   db["Postgres<br/>scan runs and findings"]
@@ -68,7 +68,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
-The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
+The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), risk-score-over-time trend, scan-to-scan regression comparison, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
 
 Risk scores use a normalized weighted model: critical, high, medium, and low findings contribute different weights, and the result is normalized by files scanned and distinct affected resources. See [ADR 0005](docs/adr/0005-normalized-risk-score.md) for the scoring formula and tradeoffs.
 
@@ -126,6 +126,12 @@ Export a persisted scan as SARIF 2.1.0 for GitHub Code Scanning:
 curl http://localhost:8000/api/scans/1/sarif \
   -H "Accept: application/sarif+json" \
   -o andela-guardrail-auditor.sarif
+```
+
+Compare two persisted scans for new and resolved findings:
+
+```bash
+curl "http://localhost:8000/api/scans/compare?base_scan_id=1&head_scan_id=2"
 ```
 
 Scan a path under the configured local scan root:
@@ -191,7 +197,7 @@ Use the scripts directory to run linting and test scopes:
 ./scripts/test-all.sh
 ```
 
-The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
+The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan comparison, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score trend, scan comparison, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
 
 The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
 
@@ -215,6 +221,8 @@ Dependabot is configured in `.github/dependabot.yml` to create one weekly groupe
 
 AWS deployment runs from the `dev` branch when the required repository variables are configured. The deploy job uses GitHub OIDC to assume an AWS role, initializes Terraform with an S3 backend, ensures the ECR repository exists, builds and pushes the Docker image, then applies the ECS/RDS/ALB infrastructure.
 
+A separate manual workflow, `.github/workflows/deploy-terraform.yml`, runs Terraform deployment independently of the app image build. It always performs `fmt`, S3 backend initialization, validation, and planning. Set its `apply` input to `true` to apply the plan, and provide `container_image` when the ECS task definition should point at a specific pre-built image.
+
 Required GitHub repository variables for deployment:
 
 - `AWS_ROLE_TO_ASSUME`: IAM role ARN trusted by GitHub OIDC.
@@ -228,6 +236,7 @@ Optional GitHub repository variables:
 - `PROJECT_NAME`: defaults to `andela-guardrail-auditor`.
 - `DEPLOY_ENVIRONMENT`: defaults to `dev`.
 - `ALLOWED_INGRESS_CIDR`: defaults to `0.0.0.0/0`; narrow this for non-demo deployments.
+- `CONTAINER_IMAGE`: fallback image URI for the manual Terraform deploy workflow when no `container_image` input is supplied.
 
 ## Terraform
 

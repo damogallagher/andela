@@ -42,7 +42,7 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     expectNoFrontendErrors(frontendErrors);
   });
 
-  test("selects a recent scan and shows that scan's results", async ({ page }) => {
+  test("selects a recent scan and shows that scan's results", async ({ page }, testInfo) => {
     const frontendErrors = trackFrontendErrors(page);
     const currentScan = sampleScan({
       id: 301,
@@ -65,7 +65,12 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     );
 
     const previousButton = page.getByRole("button", { name: /Uploaded smoke scan\s+90\s+2026-06-22 21:15/ });
-    await previousButton.click();
+    if (testInfo.project.name === "mobile-chromium") {
+      await previousButton.focus();
+      await page.keyboard.press("Enter");
+    } else {
+      await previousButton.click();
+    }
 
     await expect(previousButton).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("1 findings across 1 files")).toBeVisible();
@@ -75,6 +80,76 @@ test.describe("dashboard sample scan, filters, search, pagination, and history",
     await expect(page.locator("tbody tr")).toHaveCount(1);
     await expect(page.locator("tbody tr").first()).toContainText("uploaded-risky.tf");
     await expect(page.locator('section[aria-labelledby="findings-title"]')).toContainText("2026-06-22 21:15");
+    expectNoFrontendErrors(frontendErrors);
+  });
+
+  test("shows risk score trend and scan comparison regression", async ({ page }) => {
+    const frontendErrors = trackFrontendErrors(page);
+    const sharedFinding = {
+      id: 1,
+      rule_id: "OPEN_SSH_INGRESS",
+      severity: "critical",
+      title: "SSH exposed to the public internet",
+      resource: "aws_security_group.admin",
+      file_path: "main.tf",
+      line_number: 4,
+      recommendation: "Restrict SSH ingress to approved admin CIDR ranges.",
+      evidence: "0.0.0.0/0",
+    };
+    const baseScan = sampleScan({
+      id: 501,
+      label: "Base PR scan",
+      risk_score: 82,
+      findings_count: 1,
+      created_at: "2026-06-22T20:00:00",
+      findings: [sharedFinding],
+    });
+    const headScan = sampleScan({
+      id: 502,
+      label: "Head PR scan",
+      risk_score: 54,
+      findings_count: 3,
+      created_at: "2026-06-22T22:00:00",
+      findings: [
+        sharedFinding,
+        {
+          id: 2,
+          rule_id: "HARDCODED_SECRET",
+          severity: "critical",
+          title: "Hardcoded credential detected",
+          resource: "null_resource.credentials",
+          file_path: "main.tf",
+          line_number: 11,
+          recommendation: "Load the value from a secrets manager.",
+          evidence: "api_token = <redacted>",
+        },
+        {
+          id: 3,
+          rule_id: "HARDCODED_SECRET",
+          severity: "critical",
+          title: "Hardcoded credential detected",
+          resource: "null_resource.credentials",
+          file_path: "main.tf",
+          line_number: 12,
+          recommendation: "Load the value from a secrets manager.",
+          evidence: "client_secret = <redacted>",
+        },
+      ],
+    });
+    await mockScanHistory(page, [headScan, baseScan]);
+
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { name: "Risk Score Trend" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Risk score trend across 2 scans" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Regression Detection" })).toBeVisible();
+    await expect(page.getByLabel("Baseline scan")).toHaveValue("501");
+    await expect(page.getByLabel("Candidate scan")).toHaveValue("502");
+    await expect(page.getByText("Regression detected: this scan introduced 2 new criticals.")).toBeVisible();
+    await expect(page.locator('section[aria-labelledby="comparison-title"]')).toContainText("New findings");
+    await expect(page.locator('section[aria-labelledby="comparison-title"]')).toContainText("2");
+    await expect(page.getByLabel("Severity deltas")).toContainText("critical");
+    await expect(page.getByLabel("New findings")).toContainText("Hardcoded credential detected");
     expectNoFrontendErrors(frontendErrors);
   });
 

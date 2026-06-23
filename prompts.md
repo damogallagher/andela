@@ -343,3 +343,19 @@ A secrets-detection rule. Hardcoded credentials / AWS access keys are the most c
 ```
 
 Agent action: Added a critical hardcoded-secret scanner rule for AWS access keys and credential assignments, redacted secret evidence, expanded synthetic fixtures and tests, and updated rule catalog documentation.
+
+## 2026-06-23 01:00 IST - Prompt 041 - Scan Trend And Comparison
+
+```text
+Scan comparison / trend. You persist history but only show latest. Add risk-score-over-time on the dashboard and a diff between two scans (regression detection: "this PR introduced 2 new criticals"). Natural extension of your steer #3 (clickable recent scans).
+```
+
+Agent action: Added scan comparison API schemas and endpoint, added dashboard risk-score trend and scan regression panels, updated API and Playwright coverage, and documented scan comparison usage.
+
+## 2026-06-23 01:00 IST - Prompt 042 - Terraform AWS Deploy Workflow
+
+```text
+create a github action to deploy the terraform to aws
+```
+
+Agent action: Added a dedicated manual `Deploy Terraform AWS` workflow that configures AWS OIDC, initializes Terraform with the S3 backend, validates, plans, optionally applies, and documents required variables and container image input.

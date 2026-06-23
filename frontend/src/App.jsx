@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import styled, { ThemeProvider } from "styled-components";
 
-import { exportScanSarif, listScans, runSampleScan } from "./api.js";
+import { compareScans, exportScanSarif, listScans, runSampleScan } from "./api.js";
 import { FindingsTable } from "./components/FindingsTable.jsx";
 import { Layout, Shell } from "./components/Shell.jsx";
 import { RiskScorePanel } from "./components/RiskScorePanel.jsx";
+import { ScanComparison } from "./components/ScanComparison.jsx";
 import { ScanHistory } from "./components/ScanHistory.jsx";
+import { ScanTrend } from "./components/ScanTrend.jsx";
 import { SeverityCards } from "./components/SeverityCards.jsx";
 import { UploadScan } from "./components/UploadScan.jsx";
 import { GlobalStyle, theme } from "./styles.js";
@@ -22,10 +24,23 @@ function insertLatestScan(scans, scan) {
   return [scan, ...scans.filter((existing) => existing.id !== scan.id)].slice(0, 20);
 }
 
+function previousScanId(scans, headScanId) {
+  const headIndex = scans.findIndex((scan) => scan.id === headScanId);
+  if (headIndex >= 0 && scans[headIndex + 1]) {
+    return scans[headIndex + 1].id;
+  }
+  return scans.find((scan) => scan.id !== headScanId)?.id || null;
+}
+
 export function App() {
   const [scans, setScans] = useState([]);
   const [selectedScanId, setSelectedScanId] = useState(null);
   const [selectedSeverity, setSelectedSeverity] = useState(null);
+  const [compareBaseId, setCompareBaseId] = useState(null);
+  const [compareHeadId, setCompareHeadId] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [compareBusy, setCompareBusy] = useState(false);
+  const [compareError, setCompareError] = useState("");
   const [loading, setLoading] = useState(true);
   const [sampleBusy, setSampleBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
@@ -55,6 +70,51 @@ export function App() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedScan || scans.length < 2) {
+      setCompareHeadId(selectedScan?.id || null);
+      setCompareBaseId(null);
+      return;
+    }
+
+    setCompareHeadId(selectedScan.id);
+    setCompareBaseId(previousScanId(scans, selectedScan.id));
+  }, [scans, selectedScan]);
+
+  useEffect(() => {
+    if (!compareBaseId || !compareHeadId || compareBaseId === compareHeadId) {
+      setComparison(null);
+      setCompareError("");
+      setCompareBusy(false);
+      return;
+    }
+
+    let mounted = true;
+    setCompareBusy(true);
+    setCompareError("");
+    compareScans(compareBaseId, compareHeadId)
+      .then((payload) => {
+        if (mounted) {
+          setComparison(payload);
+        }
+      })
+      .catch((requestError) => {
+        if (mounted) {
+          setComparison(null);
+          setCompareError(requestError.message);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setCompareBusy(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [compareBaseId, compareHeadId]);
 
   async function handleRunSample() {
     setSampleBusy(true);
@@ -121,6 +181,17 @@ export function App() {
           {loading ? <LoadingBanner>Loading scans...</LoadingBanner> : null}
           <RiskScorePanel scan={selectedScan} />
           <SeverityCards counts={counts} selectedSeverity={selectedSeverity} onSelect={setSelectedSeverity} />
+          <ScanTrend scans={scans} selectedScanId={selectedScan?.id || null} />
+          <ScanComparison
+            scans={scans}
+            baseScanId={compareBaseId}
+            headScanId={compareHeadId}
+            onBaseChange={setCompareBaseId}
+            onHeadChange={setCompareHeadId}
+            comparison={comparison}
+            loading={compareBusy}
+            error={compareError}
+          />
           <UploadScan onScanCreated={handleScanCreated} />
           <FindingsTable
             key={selectedScan?.id || "empty"}

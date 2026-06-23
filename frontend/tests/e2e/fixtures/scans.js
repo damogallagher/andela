@@ -114,6 +114,122 @@ export function uploadedScan(overrides = {}) {
   };
 }
 
+function scanSummary(scan) {
+  return {
+    id: scan.id,
+    label: scan.label,
+    risk_score: scan.risk_score,
+    findings_count: scan.findings_count,
+    created_at: scan.created_at,
+  };
+}
+
+function findingKey(finding) {
+  return [
+    finding.rule_id,
+    finding.severity,
+    finding.title,
+    finding.file_path,
+    finding.line_number,
+    finding.resource,
+  ].join("|");
+}
+
+function countBySeverity(findings) {
+  return findings.reduce(
+    (counts, finding) => ({
+      ...counts,
+      [finding.severity]: (counts[finding.severity] || 0) + 1,
+    }),
+    { critical: 0, high: 0, medium: 0, low: 0 },
+  );
+}
+
+function diffFindings(baseFindings, headFindings) {
+  const baseKeys = new Map();
+  for (const finding of baseFindings) {
+    const key = findingKey(finding);
+    baseKeys.set(key, (baseKeys.get(key) || 0) + 1);
+  }
+
+  const newFindings = [];
+  for (const finding of headFindings) {
+    const key = findingKey(finding);
+    const count = baseKeys.get(key) || 0;
+    if (count > 0) {
+      baseKeys.set(key, count - 1);
+    } else {
+      newFindings.push(finding);
+    }
+  }
+
+  const headKeys = new Map();
+  for (const finding of headFindings) {
+    const key = findingKey(finding);
+    headKeys.set(key, (headKeys.get(key) || 0) + 1);
+  }
+
+  const resolvedFindings = [];
+  for (const finding of baseFindings) {
+    const key = findingKey(finding);
+    const count = headKeys.get(key) || 0;
+    if (count > 0) {
+      headKeys.set(key, count - 1);
+    } else {
+      resolvedFindings.push(finding);
+    }
+  }
+
+  return { newFindings, resolvedFindings };
+}
+
+function summaryFor(newCounts, resolvedFindings) {
+  if (newCounts.critical > 0) {
+    return `Regression detected: this scan introduced ${newCounts.critical} new ${
+      newCounts.critical === 1 ? "critical" : "criticals"
+    }.`;
+  }
+  const newTotal = Object.values(newCounts).reduce((total, count) => total + count, 0);
+  if (newTotal > 0) {
+    return `Change detected: this scan introduced ${newTotal} new ${
+      newTotal === 1 ? "finding" : "findings"
+    }, with no new criticals.`;
+  }
+  if (resolvedFindings.length > 0) {
+    return "No regression detected: this scan only resolved existing findings.";
+  }
+  return "No finding changes detected.";
+}
+
+export function compareScanPayload(baseScan, headScan) {
+  const { newFindings, resolvedFindings } = diffFindings(baseScan.findings, headScan.findings);
+  const baseCounts = countBySeverity(baseScan.findings);
+  const headCounts = countBySeverity(headScan.findings);
+  const newCounts = countBySeverity(newFindings);
+  const resolvedCounts = countBySeverity(resolvedFindings);
+  const severities = ["critical", "high", "medium", "low"];
+
+  return {
+    base_scan: scanSummary(baseScan),
+    head_scan: scanSummary(headScan),
+    risk_score_delta: headScan.risk_score - baseScan.risk_score,
+    findings_count_delta: headScan.findings_count - baseScan.findings_count,
+    new_findings_count: newFindings.length,
+    resolved_findings_count: resolvedFindings.length,
+    severity_deltas: severities.map((severity) => ({
+      severity,
+      base: baseCounts[severity],
+      head: headCounts[severity],
+      delta: headCounts[severity] - baseCounts[severity],
+      new: newCounts[severity],
+      resolved: resolvedCounts[severity],
+    })),
+    regression_summary: summaryFor(newCounts, resolvedFindings),
+    new_findings: newFindings,
+    resolved_findings: resolvedFindings,
+  };
+}
+
 export async function fulfillJson(route, payload, status = 200) {
   await route.fulfill({
     status,
@@ -123,6 +239,19 @@ export async function fulfillJson(route, payload, status = 200) {
 }
 
 export async function mockScanHistory(page, scans = []) {
+  await page.route("**/api/scans/compare?*", async (route) => {
+    const url = new URL(route.request().url());
+    const baseId = Number(url.searchParams.get("base_scan_id"));
+    const headId = Number(url.searchParams.get("head_scan_id"));
+    const baseScan = scans.find((scan) => scan.id === baseId);
+    const headScan = scans.find((scan) => scan.id === headId);
+    if (!baseScan || !headScan) {
+      await fulfillJson(route, { detail: "Scan not found" }, 404);
+      return;
+    }
+    await fulfillJson(route, compareScanPayload(baseScan, headScan));
+  });
+
   await page.route("**/api/scans", async (route) => {
     if (route.request().method() === "GET") {
       await fulfillJson(route, scans);

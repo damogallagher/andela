@@ -91,6 +91,81 @@ def test_scan_sarif_endpoint_exports_code_scanning_results(client: TestClient) -
         assert result["partialFingerprints"]["primaryLocationLineHash"]
 
 
+def test_compare_scans_reports_new_and_resolved_findings(client: TestClient) -> None:
+    base_response = client.post(
+        "/api/scans/upload",
+        data={"label": "Base PR scan"},
+        files=[
+            (
+                "files",
+                (
+                    "main.tf",
+                    'resource "aws_s3_bucket" "reports" {\n'
+                    '  bucket = "andela-pr-reports"\n'
+                    '  acl    = "public-read"\n'
+                    "}\n",
+                    "text/plain",
+                ),
+            )
+        ],
+    )
+    head_response = client.post(
+        "/api/scans/upload",
+        data={"label": "Head PR scan"},
+        files=[
+            (
+                "files",
+                (
+                    "main.tf",
+                    'resource "aws_s3_bucket" "reports" {\n'
+                    '  bucket = "andela-pr-reports"\n'
+                    '  acl    = "public-read"\n'
+                    "}\n"
+                    '\nresource "null_resource" "credentials" {\n'
+                    '  triggers = {\n'
+                    '    api_token = "example-token-01"\n'
+                    '    client_secret = "example-client-secret-02"\n'
+                    "  }\n"
+                    "}\n",
+                    "text/plain",
+                ),
+            )
+        ],
+    )
+
+    base_scan = base_response.json()
+    head_scan = head_response.json()
+
+    response = client.get(
+        "/api/scans/compare",
+        params={"base_scan_id": base_scan["id"], "head_scan_id": head_scan["id"]},
+    )
+
+    assert response.status_code == 200
+    comparison = response.json()
+    assert comparison["base_scan"]["label"] == "Base PR scan"
+    assert comparison["head_scan"]["label"] == "Head PR scan"
+    assert comparison["new_findings_count"] == 2
+    assert comparison["resolved_findings_count"] == 0
+    assert comparison["regression_summary"] == "Regression detected: this scan introduced 2 new criticals."
+    critical_delta = next(delta for delta in comparison["severity_deltas"] if delta["severity"] == "critical")
+    assert critical_delta["base"] == 0
+    assert critical_delta["head"] == 2
+    assert critical_delta["new"] == 2
+    assert {finding["rule_id"] for finding in comparison["new_findings"]} == {"HARDCODED_SECRET"}
+
+
+def test_compare_scans_requires_two_existing_scans(client: TestClient) -> None:
+    response = client.get("/api/scans/compare", params={"base_scan_id": 1, "head_scan_id": 1})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Choose two different scans to compare."
+
+    missing_response = client.get("/api/scans/compare", params={"base_scan_id": 1, "head_scan_id": 2})
+    assert missing_response.status_code == 404
+    assert missing_response.json()["detail"] == "Scan not found"
+
+
 def test_dashboard_renders_latest_scan(client: TestClient) -> None:
     client.post(
         "/api/scans",

@@ -33,3 +33,35 @@ class ScanResponse(BaseModel):
     findings_count: int
     created_at: datetime
     findings: list[FindingResponse] = []
+
+
+class ScanSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    label: str
+    risk_score: int
+    findings_count: int
+    created_at: datetime
+
+
+class SeverityDelta(BaseModel):
+    severity: str
+    base: int
+    head: int
+    delta: int
+    new: int
+    resolved: int
+
+
+class ScanComparisonResponse(BaseModel):
+    base_scan: ScanSummary
+    head_scan: ScanSummary
+    risk_score_delta: int
+    findings_count_delta: int
+    new_findings_count: int
+    resolved_findings_count: int
+    severity_deltas: list[SeverityDelta]
+    regression_summary: str
+    new_findings: list[FindingResponse]
+    resolved_findings: list[FindingResponse]

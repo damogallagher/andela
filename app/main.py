@@ -1,3 +1,4 @@
+from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,7 +22,9 @@ from app.scanner import (
     scan_path,
     severity_rank,
 )
-from app.schemas import ScanRequest, ScanResponse
+from app.schemas import FindingResponse, ScanComparisonResponse, ScanRequest, ScanResponse, ScanSummary, SeverityDelta
+
+SEVERITIES = ("critical", "high", "medium", "low")
 
 
 @asynccontextmanager
@@ -110,16 +113,48 @@ def list_scans(db: Session = Depends(get_db)) -> list[ScanRun]:
     )
 
 
+@app.get("/api/scans/compare", response_model=ScanComparisonResponse)
+def compare_scans(base_scan_id: int, head_scan_id: int, db: Session = Depends(get_db)) -> ScanComparisonResponse:
+    if base_scan_id == head_scan_id:
+        raise HTTPException(status_code=400, detail="Choose two different scans to compare.")
+
+    base_scan = _get_scan_or_404(base_scan_id, db)
+    head_scan = _get_scan_or_404(head_scan_id, db)
+    new_findings, resolved_findings = _diff_findings(base_scan.findings, head_scan.findings)
+    base_counts = Counter(finding.severity.lower() for finding in base_scan.findings)
+    head_counts = Counter(finding.severity.lower() for finding in head_scan.findings)
+    new_counts = Counter(finding.severity.lower() for finding in new_findings)
+    resolved_counts = Counter(finding.severity.lower() for finding in resolved_findings)
+
+    severity_deltas = [
+        SeverityDelta(
+            severity=severity,
+            base=base_counts.get(severity, 0),
+            head=head_counts.get(severity, 0),
+            delta=head_counts.get(severity, 0) - base_counts.get(severity, 0),
+            new=new_counts.get(severity, 0),
+            resolved=resolved_counts.get(severity, 0),
+        )
+        for severity in SEVERITIES
+    ]
+
+    return ScanComparisonResponse(
+        base_scan=ScanSummary.model_validate(base_scan),
+        head_scan=ScanSummary.model_validate(head_scan),
+        risk_score_delta=head_scan.risk_score - base_scan.risk_score,
+        findings_count_delta=head_scan.findings_count - base_scan.findings_count,
+        new_findings_count=len(new_findings),
+        resolved_findings_count=len(resolved_findings),
+        severity_deltas=severity_deltas,
+        regression_summary=_regression_summary(new_counts, resolved_findings),
+        new_findings=[FindingResponse.model_validate(finding) for finding in new_findings],
+        resolved_findings=[FindingResponse.model_validate(finding) for finding in resolved_findings],
+    )
+
+
 @app.get("/api/scans/{scan_id}", response_model=ScanResponse)
 def get_scan(scan_id: int, db: Session = Depends(get_db)) -> ScanRun:
-    scan = db.scalar(
-        select(ScanRun)
-        .options(selectinload(ScanRun.findings))
-        .where(ScanRun.id == scan_id)
-    )
-    if not scan:
-        raise HTTPException(status_code=404, detail="Scan not found")
-    return scan
+    return _get_scan_or_404(scan_id, db)
 
 
 @app.get("/api/scans/{scan_id}/sarif")
@@ -176,6 +211,67 @@ def _persist_scan(label: str, result: ScanResult, db: Session) -> ScanRun:
     db.commit()
     db.refresh(scan)
     return get_scan(scan.id, db)
+
+
+def _get_scan_or_404(scan_id: int, db: Session) -> ScanRun:
+    scan = db.scalar(
+        select(ScanRun)
+        .options(selectinload(ScanRun.findings))
+        .where(ScanRun.id == scan_id)
+    )
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return scan
+
+
+def _diff_findings(base_findings: list[Finding], head_findings: list[Finding]) -> tuple[list[Finding], list[Finding]]:
+    base_counter = Counter(_finding_identity(finding) for finding in base_findings)
+    head_counter = Counter(_finding_identity(finding) for finding in head_findings)
+
+    new_findings = []
+    remaining_base = base_counter.copy()
+    for finding in head_findings:
+        key = _finding_identity(finding)
+        if remaining_base.get(key, 0):
+            remaining_base[key] -= 1
+        else:
+            new_findings.append(finding)
+
+    resolved_findings = []
+    remaining_head = head_counter.copy()
+    for finding in base_findings:
+        key = _finding_identity(finding)
+        if remaining_head.get(key, 0):
+            remaining_head[key] -= 1
+        else:
+            resolved_findings.append(finding)
+
+    return new_findings, resolved_findings
+
+
+def _finding_identity(finding: Finding) -> tuple[str, str, str, str, int, str]:
+    return (
+        finding.rule_id,
+        finding.severity,
+        finding.title,
+        finding.file_path,
+        finding.line_number,
+        finding.resource,
+    )
+
+
+def _regression_summary(new_counts: Counter, resolved_findings: list[Finding]) -> str:
+    new_criticals = new_counts.get("critical", 0)
+    new_total = sum(new_counts.values())
+    if new_criticals:
+        critical_label = "critical" if new_criticals == 1 else "criticals"
+        return f"Regression detected: this scan introduced {new_criticals} new {critical_label}."
+    if new_total:
+        finding_label = "finding" if new_total == 1 else "findings"
+        return f"Change detected: this scan introduced {new_total} new {finding_label}, with no new criticals."
+    if resolved_findings:
+        return "No regression detected: this scan only resolved existing findings."
+    return "No finding changes detected."
 
 
 def _resolve_scan_target(raw_path: str) -> Path:

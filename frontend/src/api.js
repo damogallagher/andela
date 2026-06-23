@@ -38,3 +38,11 @@ export function exportScanSarif(scanId) {
     },
   });
 }
+
+export function compareScans(baseScanId, headScanId) {
+  const params = new URLSearchParams({
+    base_scan_id: String(baseScanId),
+    head_scan_id: String(headScanId),
+  });
+  return request(`/api/scans/compare?${params.toString()}`);
+}
