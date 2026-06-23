@@ -1,8 +1,11 @@
+import logging
+import time
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, text
@@ -13,6 +16,7 @@ from app.config import settings
 from app.database import get_db
 from app.migrations import run_migrations
 from app.models import Finding, ScanRun
+from app.observability import REQUEST_ID_HEADER, configure_logging, request_id_context, request_id_from_header
 from app.sarif import build_sarif
 from app.scanner import (
     RULES,
@@ -28,10 +32,14 @@ from app.schemas import FindingResponse, ScanComparisonResponse, ScanRequest, Sc
 SEVERITIES = ("critical", "high", "medium", "low")
 UPLOAD_READ_CHUNK_BYTES = 64 * 1024
 
+configure_logging(settings.log_level)
+logger = logging.getLogger("andela.api")
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     run_migrations()
+    configure_logging(settings.log_level)
     yield
 
 
@@ -41,7 +49,58 @@ app = FastAPI(
     description="Local-only API-first IaC security scanner with Postgres-backed scan history.",
     lifespan=lifespan,
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=[REQUEST_ID_HEADER],
+)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+@app.middleware("http")
+async def request_id_and_logging_middleware(request: Request, call_next) -> Response:
+    request_id = request_id_from_header(request.headers.get(REQUEST_ID_HEADER))
+    request.state.request_id = request_id
+    token = request_id_context.set(request_id)
+    started_at = time.perf_counter()
+
+    try:
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            logger.exception(
+                "request_failed",
+                extra={
+                    "event": "request_failed",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "duration_ms": duration_ms,
+                    "client_host": request.client.host if request.client else None,
+                },
+            )
+            raise
+
+        response.headers[REQUEST_ID_HEADER] = request_id
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        logger.info(
+            "request_completed",
+            extra={
+                "event": "request_completed",
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+                "client_host": request.client.host if request.client else None,
+            },
+        )
+        return response
+    finally:
+        request_id_context.reset(token)
 
 
 @app.get("/health")

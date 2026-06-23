@@ -375,3 +375,19 @@ Upload limits — ../../Personal/andela/app/main.py does await upload.read() wit
 ```
 
 Agent action: Added configurable upload count and per-file byte limits, replaced unbounded upload reads with chunked reads that stop at the configured cap, documented the defaults, and added functional tests for count and file-size rejection.
+
+## 2026-06-23 01:12 IST - Prompt 045 - Structured Logging Request IDs And CORS
+
+```text
+Structured logging + request IDs, and CORS config for the Vite dev server.
+```
+
+Agent action: Added request ID middleware with `X-Request-ID` propagation/generation, structured JSON request logging, configurable CORS origins for the Vite dev server, documentation, and API coverage for request IDs, log fields, and CORS behavior.
+
+## 2026-06-23 01:15 IST - Prompt 046 - README Frontend URL Check
+
+```text
+is the README.md file up to date in terms of the url for viewing the frontend?
+```
+
+Agent action: Confirmed the README lists the built FastAPI-served dashboard at `http://localhost:8000` and the Vite auto-refresh dashboard at `http://localhost:5173/static/frontend/`.

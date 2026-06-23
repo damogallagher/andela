@@ -68,6 +68,8 @@ Open:
 - API docs: http://localhost:8000/docs
 - DB-aware health check: http://localhost:8000/health
 
+API responses include an `X-Request-ID` header. Clients can send their own `X-Request-ID`; otherwise the API generates one and includes it in structured JSON request logs with method, path, status, duration, and client host. The API allows CORS requests from the Vite dev server origins `http://localhost:5173` and `http://127.0.0.1:5173` by default. Override them with `CORS_ALLOWED_ORIGINS` as a JSON array, and adjust log verbosity with `LOG_LEVEL`.
+
 The dashboard supports severity color coding, a color-coded percentage score (green above 90, amber from 70 to 90, red below 70), risk-score-over-time trend, scan-to-scan regression comparison, clickable severity filters, breadcrumbs for the active severity filter, a clear-filter action, findings search, sortable table headers, horizontal findings-table scrolling, paginated result rows, SARIF export for the selected scan, and clickable recent scan history with scan timestamps in a desktop right-side history rail.
 
 Risk scores use a normalized weighted model: critical, high, medium, and low findings contribute different weights, and the result is normalized by files scanned and distinct affected resources. See [ADR 0005](docs/adr/0005-normalized-risk-score.md) for the scoring formula and tradeoffs.

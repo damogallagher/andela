@@ -1,3 +1,6 @@
+import logging
+from uuid import UUID
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
@@ -22,6 +25,64 @@ def test_health_checks_database(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "ok"}
+
+
+def test_request_id_header_is_generated_when_missing(client: TestClient) -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    UUID(response.headers["x-request-id"])
+
+
+def test_request_id_header_is_preserved_when_provided(client: TestClient) -> None:
+    response = client.get("/health", headers={"X-Request-ID": "andela-test-request"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "andela-test-request"
+
+
+def test_request_logging_includes_structured_request_fields(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger="andela.api")
+
+    response = client.get("/health", headers={"X-Request-ID": "andela-log-request"})
+
+    assert response.status_code == 200
+    request_logs = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "request_completed"
+        and getattr(record, "request_id", None) == "andela-log-request"
+    ]
+    assert request_logs
+    assert request_logs[-1].method == "GET"
+    assert request_logs[-1].path == "/health"
+    assert request_logs[-1].status_code == 200
+    assert request_logs[-1].duration_ms >= 0
+
+
+def test_cors_allows_vite_dev_server_origin(client: TestClient) -> None:
+    response = client.get("/health", headers={"Origin": "http://localhost:5173"})
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "x-request-id" in response.headers["access-control-expose-headers"].lower()
+
+
+def test_cors_handles_vite_dev_server_preflight(client: TestClient) -> None:
+    response = client.options(
+        "/api/scans",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "X-Request-ID",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "x-request-id" in response.headers["access-control-allow-headers"].lower()
 
 
 def test_health_returns_unavailable_when_database_check_fails(client: TestClient) -> None:
