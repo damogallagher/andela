@@ -1,0 +1,89 @@
+name: Deploy Terraform AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the Terraform plan to AWS
+        required: true
+        type: boolean
+        default: false
+      container_image:
+        description: Existing container image URI for the ECS task definition
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  PROJECT_NAME: ${{ vars.PROJECT_NAME || 'andela-guardrail-auditor' }}
+  DEPLOY_ENVIRONMENT: ${{ vars.DEPLOY_ENVIRONMENT || 'dev' }}
+  ALLOWED_INGRESS_CIDR: ${{ vars.ALLOWED_INGRESS_CIDR || '0.0.0.0/0' }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'andela/terraform.tfstate' }}
+  TERRAFORM_VERSION: 1.15.5
+  CONTAINER_IMAGE: ${{ inputs.container_image || vars.CONTAINER_IMAGE || 'bootstrap' }}
+
+jobs:
+  terraform-deploy:
+    name: Terraform plan and optional apply
+    runs-on: ubuntu-latest
+    environment: production
+    if: >
+      vars.AWS_ROLE_TO_ASSUME != '' &&
+      vars.TF_STATE_BUCKET != '' &&
+      vars.TF_STATE_LOCK_TABLE != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform format check
+        run: terraform -chdir=terraform fmt -check -recursive
+
+      - name: Terraform init with S3 backend
+        run: |
+          terraform -chdir=terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${{ vars.TF_STATE_LOCK_TABLE }}" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform validate
+        run: terraform -chdir=terraform validate
+
+      - name: Terraform plan
+        run: |
+          terraform -chdir=terraform plan -out=tfplan \
+            -var="aws_region=${AWS_REGION}" \
+            -var="project_name=${PROJECT_NAME}" \
+            -var="environment=${DEPLOY_ENVIRONMENT}" \
+            -var="allowed_ingress_cidr=${ALLOWED_INGRESS_CIDR}" \
+            -var="container_image=${CONTAINER_IMAGE}"
+
+      - name: Terraform apply
+        if: ${{ inputs.apply }}
+        run: terraform -chdir=terraform apply -auto-approve tfplan
+
+      - name: Terraform outputs
+        if: ${{ inputs.apply }}
+        run: terraform -chdir=terraform output
