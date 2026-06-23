@@ -1,4 +1,4 @@
-FROM node:22-alpine AS frontend-build
+FROM node:26-alpine AS frontend-build
 
 WORKDIR /build
 
@@ -8,7 +8,7 @@ RUN cd frontend && npm ci --omit=dev
 COPY frontend ./frontend
 RUN cd frontend && npm run build
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
