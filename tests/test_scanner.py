@@ -33,7 +33,7 @@ def rule_counts(path: Path) -> Counter:
 
 
 def test_rule_registry_contains_metadata_and_check_functions() -> None:
-    assert [rule.rule_id for rule in RULES] == [
+    core_rule_ids = [
         "OPEN_SSH_INGRESS",
         "HARDCODED_SECRET",
         "S3_PUBLIC_ACL",
@@ -41,9 +41,54 @@ def test_rule_registry_contains_metadata_and_check_functions() -> None:
         "DATABASE_ENCRYPTION_DISABLED",
         "S3_VERSIONING_DISABLED",
     ]
+    assert [rule.rule_id for rule in RULES[: len(core_rule_ids)]] == core_rule_ids
+    assert len(RULES) >= 100
     assert set(RULES_BY_ID) == {rule.rule_id for rule in RULES}
+    assert len(RULES_BY_ID) == len(RULES)
+    assert "AWS_CLOUDTRAIL_ENABLE_LOGGING_DISABLED" in RULES_BY_ID
+    assert "AZURE_STORAGE_ACCOUNT_ENABLE_HTTPS_TRAFFIC_ONLY_DISABLED" in RULES_BY_ID
+    assert "AZURE_KUBERNETES_CLUSTER_ROLE_BASED_ACCESS_CONTROL_ENABLED_DISABLED" in RULES_BY_ID
     assert all(rule.title and rule.severity and rule.description and rule.recommendation for rule in RULES)
     assert all(callable(rule.check) for rule in RULES)
+
+
+def test_catalog_detects_representative_aws_and_azure_vulnerabilities() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="catalog_rules.tf",
+                content="""
+resource "aws_cloudtrail" "audit" {
+  enable_logging = false
+}
+
+resource "aws_ebs_volume" "data" {
+  encrypted = false
+}
+
+resource "azurerm_storage_account" "logs" {
+  enable_https_traffic_only = false
+  min_tls_version = "TLS1_0"
+}
+
+resource "azurerm_kubernetes_cluster" "aks" {
+  role_based_access_control_enabled = false
+}
+""",
+            )
+        ],
+        "uploaded: catalog_rules.tf",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter(
+        {
+            "AWS_CLOUDTRAIL_ENABLE_LOGGING_DISABLED": 1,
+            "AWS_EBS_VOLUME_ENCRYPTED_DISABLED": 1,
+            "AZURE_STORAGE_ACCOUNT_ENABLE_HTTPS_TRAFFIC_ONLY_DISABLED": 1,
+            "AZURE_STORAGE_ACCOUNT_MIN_TLS_VERSION_WEAK_TLS": 1,
+            "AZURE_KUBERNETES_CLUSTER_ROLE_BASED_ACCESS_CONTROL_ENABLED_DISABLED": 1,
+        }
+    )
 
 
 def test_both_risky_scenario_detects_terraform_and_json_findings() -> None:

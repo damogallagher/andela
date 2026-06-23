@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: andela_guardrails
       POSTGRES_USER: andela
-      POSTGRES_PASSWORD: andela
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U andela -d andela_guardrails"]
       interval: 5s
@@ -20,7 +20,7 @@ services:
     build: .
     container_name: andela-app
     environment:
-      DATABASE_URL: postgresql+psycopg://andela:andela@db:5432/andela_guardrails
+      DATABASE_URL: postgresql+psycopg://andela:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}@db:5432/andela_guardrails
       APP_SCAN_ROOT: /app
     depends_on:
       db:

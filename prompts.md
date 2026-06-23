@@ -399,3 +399,47 @@ Repo hygiene: LICENSE, SECURITY.md, CHANGELOG.md, .editorconfig, and a pre-commi
 ```
 
 Agent action: Added MIT license, security policy, changelog, editor configuration, pre-commit configuration, pre-commit dev dependency, README setup details, and aligned the CI frontend lint step with the shared lint script.
+
+## 2026-06-23 01:20 IST - Prompt 048 - Vite Frontend URL And Docs Routing
+
+```text
+They differ because they are not the same app entry path.
+http://localhost:8000/ is FastAPI serving the built React dashboard.
+http://localhost:5173/ is the Vite dev server root.
+The correct Vite dev dashboard URL is http://localhost:5173/static/frontend/.
+That path is intentional because frontend/vite.config.js sets: which url should I go to? If I go to http://localhost:5173/ and lick docs, it tries to load http://localhost:5173/docs and that fails with this mesage The server is configured with a public base URL of /static/frontend/ - did you mean to visit [/static/frontend/docs](http://localhost:5173/static/frontend/docs) instead?
+```
+
+Agent action: Clarified that `http://localhost:8000/` is the normal app URL and `http://localhost:5173/static/frontend/` is the Vite hot-reload URL, then updated Vite to redirect the bare dev root and proxy `/docs` plus `/openapi.json` to FastAPI.
+
+## 2026-06-23 01:22 IST - Prompt 049 - Python Dependency Lockfile
+
+```text
+Pin dependencies / lockfile for Python (requirements*.txt aren't pinned the way package-lock.json is) — relevant since you're adding Dependabot.
+```
+
+Agent action: Not implemented yet; the later local runtime and database requests took priority before a Python lockfile was generated.
+
+## 2026-06-23 01:23 IST - Prompt 050 - Expanded AWS And Azure Scanner Catalog
+
+```text
+Update scanner.py to detect for 100s of vulnerabilities on AWS or Azure. Also add notes that we could include a call to an LLM to detect vulnerabilities if none is detected in our code. I purposely did not use an LLM here to keep costs down
+```
+
+Agent action: Expanded the deterministic scanner registry with more than 100 AWS and Azure Terraform vulnerability signatures, added representative scanner tests, and documented the optional future LLM fallback as intentionally omitted to keep local and CI runs cost-free.
+
+## 2026-06-23 01:24 IST - Prompt 051 - Local Alembic Startup Error
+
+```text
+I get this error locally:
+```
+
+Agent action: Reviewed the attached Docker Compose log showing Alembic trying to create existing `scan_runs` tables, then added a Postgres Alembic stamping guard for existing pre-Alembic local schemas so scan history can be preserved.
+
+## 2026-06-23 01:28 IST - Prompt 052 - Remove SQLite
+
+```text
+lcoal issue is resolved - remvoe SQLIte
+```
+
+Agent action: Removed SQLite runtime, test, and CI paths; added a dedicated Postgres test database bootstrap script; updated functional tests and GitHub Actions to use Postgres services; documented the Postgres-only test setup; and moved local Postgres passwords out of committed Compose, settings, test, and README defaults.

@@ -48,7 +48,7 @@ flowchart TB
   ci -. optional deploy .-> terraform
 ```
 
-Architecture decisions are documented in [docs/adr](docs/adr/README.md), including local-only delivery, Postgres over SQLite, focused pattern scanning over a full HCL parser, the API/CLI/SARIF interface split, and the normalized risk score model.
+Architecture decisions are documented in [docs/adr](docs/adr/README.md), including local-only delivery, the Postgres database choice, focused pattern scanning over a full HCL parser, the API/CLI/SARIF interface split, and the normalized risk score model.
 
 ## Coding Agent And Model
 
@@ -59,6 +59,8 @@ Architecture decisions are documented in [docs/adr](docs/adr/README.md), includi
 ## Run Locally
 
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD to a local-only database password.
 docker compose up --build
 ```
 
@@ -81,7 +83,7 @@ The default Compose configuration starts:
 - `andela-postgres` running Postgres 17 on port `5432`
 - `andela-frontend` on port `5173` for Vite hot reload during React development
 
-The API runs Alembic migrations on startup, so local Docker Compose and CI use the versioned schema in `alembic/versions` instead of `Base.metadata.create_all`.
+The API runs Alembic migrations on startup, so local Docker Compose and CI use the versioned schema in `alembic/versions` instead of `Base.metadata.create_all`. The runtime expects a PostgreSQL `DATABASE_URL`.
 
 Postgres 17 uses the `postgres17-data` Docker volume. If you previously ran the project with Postgres 16, the old `postgres-data` volume is left untouched because Postgres data directories are not major-version compatible in place. Once you no longer need old local scan history, remove that old volume manually with `docker volume rm andela_postgres-data`.
 
@@ -108,6 +110,7 @@ docker compose up frontend
 ```
 
 Open http://localhost:5173/static/frontend/. The Vite dev server proxies `/api` and `/health` to the Compose `app` service.
+The bare Vite root, http://localhost:5173/, redirects to `/static/frontend/`; `/docs` and `/openapi.json` also proxy to FastAPI so the dashboard API docs link works in dev mode.
 
 ## Run A Sample Scan
 
@@ -178,6 +181,8 @@ The `sample_iac/scenarios` folder contains Terraform and JSON CloudFormation-sty
 
 The sample findings cover public SSH ingress, hardcoded credentials, AWS access key patterns, public S3 ACLs, wildcard IAM policies, disabled database encryption, and suspended S3 versioning.
 
+The deterministic scanner catalog includes more than 100 AWS and Azure Terraform vulnerability signatures across logging, network exposure, TLS, encryption, backup, deletion protection, IAM, authentication, and workload runtime controls. A future extension could call an LLM as a fallback when deterministic rules find no issues, but that is intentionally not implemented here so the local build stays free to run, predictable in CI, and independent of external API keys.
+
 Rule metadata and rule check functions are registered once in `app.scanner.RULES`. Scanner findings, `/api/rules`, and SARIF rule metadata all read from that registry to avoid drift.
 Secret findings redact evidence before persistence, dashboard display, CLI output, and SARIF export.
 
@@ -192,6 +197,9 @@ pip install -r requirements-dev.txt
 Use the scripts directory to run linting and test scopes:
 
 ```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD before starting Postgres.
+docker compose up -d db
 ./scripts/lint-project.sh
 ./scripts/lint-all.sh
 ./scripts/lint-backend.sh

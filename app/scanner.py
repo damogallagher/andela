@@ -82,6 +82,17 @@ class Rule:
     check: Callable[["Rule", ScanContext], list[FindingCandidate]]
 
 
+@dataclass(frozen=True)
+class PatternRuleSpec:
+    rule_id: str
+    title: str
+    severity: str
+    description: str
+    recommendation: str
+    resource_type: str
+    line_pattern: str
+
+
 def scan_path(path: Path) -> ScanResult:
     target = path.resolve()
     if not target.exists():
@@ -137,11 +148,7 @@ def severity_rank(severity: str) -> int:
 def _collect_files(target: Path) -> list[Path]:
     if target.is_file():
         return [target] if target.suffix.lower() in SUPPORTED_EXTENSIONS else []
-    return sorted(
-        path
-        for path in target.rglob("*")
-        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
-    )
+    return sorted(path for path in target.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS)
 
 
 def _scan_file(file_path: str, content: str) -> list[FindingCandidate]:
@@ -291,9 +298,13 @@ def _open_ssh_ingress(rule: Rule, context: ScanContext) -> list[FindingCandidate
             for ingress_rule in ingress_rules:
                 if not isinstance(ingress_rule, dict):
                     continue
-                exposes_ssh = _safe_int(ingress_rule.get("FromPort"), -1) <= 22 <= _safe_int(
-                    ingress_rule.get("ToPort"),
-                    -1,
+                exposes_ssh = (
+                    _safe_int(ingress_rule.get("FromPort"), -1)
+                    <= 22
+                    <= _safe_int(
+                        ingress_rule.get("ToPort"),
+                        -1,
+                    )
                 )
                 world_open = ingress_rule.get("CidrIp") == "0.0.0.0/0" or ingress_rule.get("CidrIpv6") == "::/0"
                 if exposes_ssh and world_open:
@@ -441,7 +452,650 @@ def _s3_versioning_disabled(rule: Rule, context: ScanContext) -> list[FindingCan
     return findings
 
 
-RULES = (
+def _catalog_pattern_check(rule: Rule, context: ScanContext) -> list[FindingCandidate]:
+    spec = CATALOG_PATTERN_SPECS_BY_ID[rule.rule_id]
+    findings: list[FindingCandidate] = []
+    seen: set[tuple[int, str]] = set()
+
+    for match in re.finditer(spec.line_pattern, context.content, re.IGNORECASE):
+        resource = _nearest_resource(context.content, match.start())
+        if not resource.startswith(f"{spec.resource_type}."):
+            continue
+
+        line_number = _line_number(context.content, match.start())
+        finding_key = (line_number, resource)
+        if finding_key in seen:
+            continue
+        seen.add(finding_key)
+        findings.append(
+            _finding(
+                rule,
+                context,
+                line_number,
+                resource,
+                _line_at(context.content, match.start()),
+            )
+        )
+
+    return findings
+
+
+def _signature_spec(
+    provider: str,
+    resource_type: str,
+    attribute: str,
+    bad_value_pattern: str,
+    bad_label: str,
+    severity: str,
+    category: str,
+    title: Optional[str] = None,
+) -> PatternRuleSpec:
+    normalized_resource = _provider_neutral_resource(provider, resource_type)
+    return PatternRuleSpec(
+        rule_id=_signature_rule_id(provider, resource_type, attribute, bad_label),
+        title=title
+        or f"{provider} {_humanize_resource(normalized_resource)} {_humanize_attribute(attribute)} {bad_label}",
+        severity=severity,
+        description=(
+            f"Detects {provider} Terraform resources of type {resource_type} where "
+            f"{attribute} is set to an insecure value."
+        ),
+        recommendation=CATALOG_RECOMMENDATIONS[category],
+        resource_type=resource_type,
+        line_pattern=rf"\b{re.escape(attribute)}\s*=\s*{bad_value_pattern}",
+    )
+
+
+def _signature_rule_id(provider: str, resource_type: str, attribute: str, bad_label: str) -> str:
+    normalized_resource = _provider_neutral_resource(provider, resource_type)
+    return re.sub(r"[^A-Z0-9]+", "_", f"{provider}_{normalized_resource}_{attribute}_{bad_label}".upper()).strip("_")
+
+
+def _provider_neutral_resource(provider: str, resource_type: str) -> str:
+    normalized_provider = provider.lower()
+    if resource_type.startswith(f"{normalized_provider}_"):
+        return resource_type.removeprefix(f"{normalized_provider}_")
+    if normalized_provider == "azure" and resource_type.startswith("azurerm_"):
+        return resource_type.removeprefix("azurerm_")
+    return resource_type
+
+
+def _humanize_resource(resource_type: str) -> str:
+    return resource_type.replace("_", " ")
+
+
+def _humanize_attribute(attribute: str) -> str:
+    return attribute.replace("_", " ")
+
+
+CATALOG_RECOMMENDATIONS = {
+    "auth": "Disable local or shared-key authentication paths and use managed identity or IAM roles.",
+    "backup": "Enable backups, point-in-time recovery, and retention settings that meet recovery requirements.",
+    "deletion": "Enable deletion protection or equivalent safeguards for stateful and critical resources.",
+    "encryption": "Enable encryption at rest and in transit using provider-managed or customer-managed keys.",
+    "headers": "Enable strict protocol and header handling for internet-facing services.",
+    "iam": "Harden IAM and identity policy settings to enforce least privilege and strong authentication.",
+    "logging": "Enable audit logging, metrics, tracing, and retention for investigation and compliance.",
+    "network": "Disable public exposure and require private endpoints, trusted networks, or explicit allowlists.",
+    "runtime": "Disable privileged runtime features and enforce hardened workload defaults.",
+    "tls": "Require HTTPS and TLS 1.2 or later for all service endpoints.",
+}
+
+TLS_WEAK_VALUE = r'"(?:TLS1_0|TLS1_1|TLSv1|TLSv1\.1|1\.0|1\.1)"'
+ZERO_OR_LOW_RETENTION = r"(?:0|[1-9]|[12][0-9])\b"
+SHORT_PASSWORD_LENGTH = r"[0-7]\b"
+
+AWS_SIGNATURES = (
+    _signature_spec("AWS", "aws_cloudtrail", "enable_logging", "false\\b", "disabled", "high", "logging"),
+    _signature_spec(
+        "AWS", "aws_cloudtrail", "include_global_service_events", "false\\b", "disabled", "medium", "logging"
+    ),
+    _signature_spec("AWS", "aws_cloudtrail", "is_multi_region_trail", "false\\b", "disabled", "medium", "logging"),
+    _signature_spec("AWS", "aws_cloudtrail", "enable_log_file_validation", "false\\b", "disabled", "medium", "logging"),
+    _signature_spec("AWS", "aws_ebs_volume", "encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_efs_file_system", "encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_redshift_cluster", "encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_redshift_cluster", "publicly_accessible", "true\\b", "enabled", "critical", "network"),
+    _signature_spec("AWS", "aws_redshift_cluster", "enhanced_vpc_routing", "false\\b", "disabled", "medium", "network"),
+    _signature_spec("AWS", "aws_opensearch_domain", "enforce_https", "false\\b", "disabled", "high", "tls"),
+    _signature_spec("AWS", "aws_elasticsearch_domain", "enforce_https", "false\\b", "disabled", "high", "tls"),
+    _signature_spec("AWS", "aws_neptune_cluster", "storage_encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_neptune_cluster", "deletion_protection", "false\\b", "disabled", "medium", "deletion"),
+    _signature_spec(
+        "AWS",
+        "aws_neptune_cluster",
+        "iam_database_authentication_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "iam",
+    ),
+    _signature_spec("AWS", "aws_docdb_cluster", "storage_encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_docdb_cluster", "deletion_protection", "false\\b", "disabled", "medium", "deletion"),
+    _signature_spec("AWS", "aws_rds_cluster", "storage_encrypted", "false\\b", "disabled", "high", "encryption"),
+    _signature_spec("AWS", "aws_rds_cluster", "deletion_protection", "false\\b", "disabled", "medium", "deletion"),
+    _signature_spec("AWS", "aws_rds_cluster", "copy_tags_to_snapshot", "false\\b", "disabled", "low", "backup"),
+    _signature_spec(
+        "AWS",
+        "aws_rds_cluster",
+        "iam_database_authentication_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "iam",
+    ),
+    _signature_spec("AWS", "aws_db_instance", "publicly_accessible", "true\\b", "enabled", "critical", "network"),
+    _signature_spec("AWS", "aws_db_instance", "deletion_protection", "false\\b", "disabled", "medium", "deletion"),
+    _signature_spec("AWS", "aws_db_instance", "backup_retention_period", "0\\b", "zero", "medium", "backup"),
+    _signature_spec("AWS", "aws_db_instance", "skip_final_snapshot", "true\\b", "enabled", "low", "backup"),
+    _signature_spec("AWS", "aws_db_instance", "copy_tags_to_snapshot", "false\\b", "disabled", "low", "backup"),
+    _signature_spec(
+        "AWS",
+        "aws_db_instance",
+        "iam_database_authentication_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "iam",
+    ),
+    _signature_spec("AWS", "aws_db_instance", "performance_insights_enabled", "false\\b", "disabled", "low", "logging"),
+    _signature_spec("AWS", "aws_db_instance", "monitoring_interval", "0\\b", "zero", "low", "logging"),
+    _signature_spec(
+        "AWS", "aws_s3_bucket_public_access_block", "block_public_acls", "false\\b", "disabled", "high", "network"
+    ),
+    _signature_spec(
+        "AWS", "aws_s3_bucket_public_access_block", "block_public_policy", "false\\b", "disabled", "high", "network"
+    ),
+    _signature_spec(
+        "AWS", "aws_s3_bucket_public_access_block", "ignore_public_acls", "false\\b", "disabled", "medium", "network"
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_s3_bucket_public_access_block",
+        "restrict_public_buckets",
+        "false\\b",
+        "disabled",
+        "high",
+        "network",
+    ),
+    _signature_spec(
+        "AWS", "aws_s3_account_public_access_block", "block_public_acls", "false\\b", "disabled", "high", "network"
+    ),
+    _signature_spec(
+        "AWS", "aws_s3_account_public_access_block", "block_public_policy", "false\\b", "disabled", "high", "network"
+    ),
+    _signature_spec(
+        "AWS", "aws_s3_account_public_access_block", "ignore_public_acls", "false\\b", "disabled", "medium", "network"
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_s3_account_public_access_block",
+        "restrict_public_buckets",
+        "false\\b",
+        "disabled",
+        "high",
+        "network",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_elasticache_replication_group",
+        "at_rest_encryption_enabled",
+        "false\\b",
+        "disabled",
+        "high",
+        "encryption",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_elasticache_replication_group",
+        "transit_encryption_enabled",
+        "false\\b",
+        "disabled",
+        "high",
+        "encryption",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_elasticache_replication_group",
+        "automatic_failover_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "backup",
+    ),
+    _signature_spec("AWS", "aws_lb", "enable_deletion_protection", "false\\b", "disabled", "low", "deletion"),
+    _signature_spec("AWS", "aws_lb", "drop_invalid_header_fields", "false\\b", "disabled", "medium", "headers"),
+    _signature_spec("AWS", "aws_lb", "enable_http2", "false\\b", "disabled", "low", "headers"),
+    _signature_spec("AWS", "aws_alb", "enable_deletion_protection", "false\\b", "disabled", "low", "deletion"),
+    _signature_spec("AWS", "aws_alb", "drop_invalid_header_fields", "false\\b", "disabled", "medium", "headers"),
+    _signature_spec("AWS", "aws_alb", "enable_http2", "false\\b", "disabled", "low", "headers"),
+    _signature_spec("AWS", "aws_api_gateway_stage", "xray_tracing_enabled", "false\\b", "disabled", "low", "logging"),
+    _signature_spec(
+        "AWS", "aws_api_gateway_stage", "cache_data_encrypted", "false\\b", "disabled", "medium", "encryption"
+    ),
+    _signature_spec("AWS", "aws_lambda_function", "mode", '"PassThrough"', "passthrough", "low", "logging"),
+    _signature_spec(
+        "AWS", "aws_cloudwatch_log_group", "retention_in_days", ZERO_OR_LOW_RETENTION, "low", "low", "logging"
+    ),
+    _signature_spec("AWS", "aws_kms_key", "enable_key_rotation", "false\\b", "disabled", "medium", "encryption"),
+    _signature_spec("AWS", "aws_kms_key", "deletion_window_in_days", r"(?:7|8|9)\b", "short", "low", "deletion"),
+    _signature_spec(
+        "AWS",
+        "aws_iam_account_password_policy",
+        "require_uppercase_characters",
+        "false\\b",
+        "disabled",
+        "medium",
+        "iam",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_iam_account_password_policy",
+        "require_lowercase_characters",
+        "false\\b",
+        "disabled",
+        "medium",
+        "iam",
+    ),
+    _signature_spec(
+        "AWS", "aws_iam_account_password_policy", "require_numbers", "false\\b", "disabled", "medium", "iam"
+    ),
+    _signature_spec(
+        "AWS", "aws_iam_account_password_policy", "require_symbols", "false\\b", "disabled", "medium", "iam"
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_iam_account_password_policy",
+        "minimum_password_length",
+        SHORT_PASSWORD_LENGTH,
+        "short",
+        "medium",
+        "iam",
+    ),
+    _signature_spec("AWS", "aws_iam_account_password_policy", "max_password_age", "0\\b", "zero", "low", "iam"),
+    _signature_spec(
+        "AWS",
+        "aws_iam_account_password_policy",
+        "allow_users_to_change_password",
+        "false\\b",
+        "disabled",
+        "low",
+        "iam",
+    ),
+    _signature_spec("AWS", "aws_ecr_repository", "image_tag_mutability", '"MUTABLE"', "mutable", "medium", "runtime"),
+    _signature_spec("AWS", "aws_ecr_repository", "scan_on_push", "false\\b", "disabled", "medium", "runtime"),
+    _signature_spec("AWS", "aws_ecs_task_definition", "privileged", "true\\b", "enabled", "critical", "runtime"),
+    _signature_spec(
+        "AWS", "aws_ecs_task_definition", "readonly_root_filesystem", "false\\b", "disabled", "medium", "runtime"
+    ),
+    _signature_spec("AWS", "aws_instance", "associate_public_ip_address", "true\\b", "enabled", "high", "network"),
+    _signature_spec("AWS", "aws_instance", "monitoring", "false\\b", "disabled", "low", "logging"),
+    _signature_spec(
+        "AWS", "aws_launch_template", "associate_public_ip_address", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec("AWS", "aws_launch_template", "http_tokens", '"optional"', "optional", "medium", "iam"),
+    _signature_spec("AWS", "aws_sqs_queue", "sqs_managed_sse_enabled", "false\\b", "disabled", "medium", "encryption"),
+    _signature_spec(
+        "AWS", "aws_dynamodb_table", "deletion_protection_enabled", "false\\b", "disabled", "medium", "deletion"
+    ),
+    _signature_spec(
+        "AWS", "aws_dynamodb_table", "point_in_time_recovery_enabled", "false\\b", "disabled", "medium", "backup"
+    ),
+    _signature_spec("AWS", "aws_mq_broker", "publicly_accessible", "true\\b", "enabled", "critical", "network"),
+    _signature_spec("AWS", "aws_transfer_server", "endpoint_type", '"PUBLIC"', "public", "high", "network"),
+    _signature_spec(
+        "AWS",
+        "aws_cloudfront_distribution",
+        "viewer_protocol_policy",
+        '"allow-all"',
+        "allow_all",
+        "high",
+        "tls",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_cloudfront_distribution",
+        "minimum_protocol_version",
+        '"TLSv1"',
+        "weak_tls",
+        "high",
+        "tls",
+    ),
+    _signature_spec(
+        "AWS",
+        "aws_acm_certificate",
+        "certificate_transparency_logging_preference",
+        '"DISABLED"',
+        "disabled",
+        "low",
+        "logging",
+    ),
+    _signature_spec("AWS", "aws_backup_vault", "force_destroy", "true\\b", "enabled", "medium", "deletion"),
+)
+
+AZURE_SIGNATURES = (
+    _signature_spec(
+        "AZURE", "azurerm_storage_account", "enable_https_traffic_only", "false\\b", "disabled", "high", "tls"
+    ),
+    _signature_spec("AZURE", "azurerm_storage_account", "min_tls_version", TLS_WEAK_VALUE, "weak_tls", "high", "tls"),
+    _signature_spec(
+        "AZURE", "azurerm_storage_account", "allow_blob_public_access", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_storage_account", "shared_access_key_enabled", "true\\b", "enabled", "medium", "auth"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_storage_account", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec("AZURE", "azurerm_storage_account", "nfsv3_enabled", "true\\b", "enabled", "medium", "network"),
+    _signature_spec(
+        "AZURE",
+        "azurerm_storage_account",
+        "cross_tenant_replication_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_storage_account",
+        "infrastructure_encryption_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "encryption",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_key_vault", "purge_protection_enabled", "false\\b", "disabled", "medium", "deletion"
+    ),
+    _signature_spec("AZURE", "azurerm_key_vault", "soft_delete_retention_days", "0\\b", "zero", "medium", "deletion"),
+    _signature_spec(
+        "AZURE", "azurerm_key_vault", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec("AZURE", "azurerm_key_vault", "enabled_for_deployment", "true\\b", "enabled", "low", "iam"),
+    _signature_spec(
+        "AZURE", "azurerm_key_vault", "enabled_for_template_deployment", "true\\b", "enabled", "low", "iam"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_key_vault", "enabled_for_disk_encryption", "false\\b", "disabled", "low", "encryption"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_mssql_server", "public_network_access_enabled", "true\\b", "enabled", "critical", "network"
+    ),
+    _signature_spec("AZURE", "azurerm_mssql_server", "minimum_tls_version", TLS_WEAK_VALUE, "weak_tls", "high", "tls"),
+    _signature_spec(
+        "AZURE",
+        "azurerm_mssql_server",
+        "outbound_network_restriction_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_mssql_database",
+        "transparent_data_encryption_enabled",
+        "false\\b",
+        "disabled",
+        "high",
+        "encryption",
+    ),
+    _signature_spec("AZURE", "azurerm_mssql_database", "zone_redundant", "false\\b", "disabled", "low", "backup"),
+    _signature_spec(
+        "AZURE",
+        "azurerm_mysql_flexible_server",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "critical",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_mysql_flexible_server", "backup_retention_days", r"[1-6]\b", "low", "medium", "backup"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_postgresql_flexible_server",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "critical",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_postgresql_flexible_server", "backup_retention_days", r"[1-6]\b", "low", "medium", "backup"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_cosmosdb_account", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_cosmosdb_account", "local_authentication_disabled", "false\\b", "disabled", "medium", "auth"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_cosmosdb_account", "automatic_failover_enabled", "false\\b", "disabled", "medium", "backup"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_kubernetes_cluster", "local_account_disabled", "false\\b", "disabled", "high", "iam"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_kubernetes_cluster", "private_cluster_enabled", "false\\b", "disabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_kubernetes_cluster",
+        "role_based_access_control_enabled",
+        "false\\b",
+        "disabled",
+        "critical",
+        "iam",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_kubernetes_cluster", "oidc_issuer_enabled", "false\\b", "disabled", "medium", "iam"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_kubernetes_cluster", "azure_policy_enabled", "false\\b", "disabled", "medium", "iam"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_kubernetes_cluster",
+        "http_application_routing_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec("AZURE", "azurerm_container_registry", "admin_enabled", "true\\b", "enabled", "high", "auth"),
+    _signature_spec(
+        "AZURE", "azurerm_container_registry", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_container_registry", "quarantine_policy_enabled", "false\\b", "disabled", "low", "runtime"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_container_registry", "trust_policy_enabled", "false\\b", "disabled", "medium", "runtime"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_linux_virtual_machine",
+        "disable_password_authentication",
+        "false\\b",
+        "disabled",
+        "high",
+        "iam",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_linux_virtual_machine",
+        "encryption_at_host_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "encryption",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_windows_virtual_machine",
+        "enable_automatic_updates",
+        "false\\b",
+        "disabled",
+        "medium",
+        "runtime",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_windows_virtual_machine", "provision_vm_agent", "false\\b", "disabled", "medium", "runtime"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_windows_virtual_machine",
+        "encryption_at_host_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "encryption",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_network_security_rule",
+        "source_address_prefix",
+        r'"(?:\*|0\.0\.0\.0/0)"',
+        "public",
+        "high",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_network_security_rule", "destination_port_range", '"22"', "ssh", "high", "network"
+    ),
+    _signature_spec("AZURE", "azurerm_app_service", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec("AZURE", "azurerm_app_service", "client_cert_enabled", "false\\b", "disabled", "medium", "auth"),
+    _signature_spec("AZURE", "azurerm_linux_web_app", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec(
+        "AZURE", "azurerm_linux_web_app", "public_network_access_enabled", "true\\b", "enabled", "medium", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_linux_web_app", "client_certificate_enabled", "false\\b", "disabled", "medium", "auth"
+    ),
+    _signature_spec("AZURE", "azurerm_windows_web_app", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec(
+        "AZURE", "azurerm_windows_web_app", "public_network_access_enabled", "true\\b", "enabled", "medium", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_windows_web_app", "client_certificate_enabled", "false\\b", "disabled", "medium", "auth"
+    ),
+    _signature_spec("AZURE", "azurerm_function_app", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec("AZURE", "azurerm_function_app", "client_cert_mode", '"Optional"', "optional", "low", "auth"),
+    _signature_spec("AZURE", "azurerm_linux_function_app", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec(
+        "AZURE",
+        "azurerm_linux_function_app",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec("AZURE", "azurerm_windows_function_app", "https_only", "false\\b", "disabled", "high", "tls"),
+    _signature_spec(
+        "AZURE",
+        "azurerm_windows_function_app",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec("AZURE", "azurerm_application_gateway", "enable_http2", "false\\b", "disabled", "low", "headers"),
+    _signature_spec("AZURE", "azurerm_cdn_endpoint", "is_http_allowed", "true\\b", "enabled", "medium", "tls"),
+    _signature_spec("AZURE", "azurerm_cdn_endpoint", "is_https_allowed", "false\\b", "disabled", "medium", "tls"),
+    _signature_spec(
+        "AZURE", "azurerm_monitor_diagnostic_setting", "enabled", "false\\b", "disabled", "medium", "logging"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_log_analytics_workspace", "retention_in_days", ZERO_OR_LOW_RETENTION, "low", "low", "logging"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_managed_disk", "public_network_access_enabled", "true\\b", "enabled", "medium", "network"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_managed_disk", "encryption_settings_enabled", "false\\b", "disabled", "high", "encryption"
+    ),
+    _signature_spec("AZURE", "azurerm_redis_cache", "enable_non_ssl_port", "true\\b", "enabled", "high", "tls"),
+    _signature_spec("AZURE", "azurerm_redis_cache", "minimum_tls_version", TLS_WEAK_VALUE, "weak_tls", "high", "tls"),
+    _signature_spec(
+        "AZURE", "azurerm_redis_cache", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_servicebus_namespace",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_servicebus_namespace", "local_auth_enabled", "true\\b", "enabled", "medium", "auth"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_servicebus_namespace", "minimum_tls_version", TLS_WEAK_VALUE, "weak_tls", "medium", "tls"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_eventhub_namespace",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_eventhub_namespace", "local_authentication_enabled", "true\\b", "enabled", "medium", "auth"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_eventhub_namespace", "minimum_tls_version", TLS_WEAK_VALUE, "weak_tls", "medium", "tls"
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_synapse_workspace", "public_network_access_enabled", "true\\b", "enabled", "high", "network"
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_synapse_workspace",
+        "managed_virtual_network_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_synapse_workspace",
+        "data_exfiltration_protection_enabled",
+        "false\\b",
+        "disabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE",
+        "azurerm_machine_learning_workspace",
+        "public_network_access_enabled",
+        "true\\b",
+        "enabled",
+        "medium",
+        "network",
+    ),
+    _signature_spec(
+        "AZURE", "azurerm_cognitive_account", "public_network_access_enabled", "true\\b", "enabled", "medium", "network"
+    ),
+    _signature_spec("AZURE", "azurerm_cognitive_account", "local_auth_enabled", "true\\b", "enabled", "medium", "auth"),
+)
+
+CATALOG_PATTERN_SPECS = AWS_SIGNATURES + AZURE_SIGNATURES
+CATALOG_PATTERN_SPECS_BY_ID = {spec.rule_id: spec for spec in CATALOG_PATTERN_SPECS}
+
+
+CORE_RULES = (
     Rule(
         rule_id="OPEN_SSH_INGRESS",
         title="SSH exposed to the public internet",
@@ -491,6 +1145,19 @@ RULES = (
         check=_s3_versioning_disabled,
     ),
 )
+
+CATALOG_RULES = tuple(
+    Rule(
+        rule_id=spec.rule_id,
+        title=spec.title,
+        severity=spec.severity,
+        description=spec.description,
+        recommendation=spec.recommendation,
+        check=_catalog_pattern_check,
+    )
+    for spec in CATALOG_PATTERN_SPECS
+)
+RULES = CORE_RULES + CATALOG_RULES
 RULES_BY_ID = {rule.rule_id: rule for rule in RULES}
 
 
@@ -527,7 +1194,7 @@ def _has_wildcard(value) -> bool:
 
 
 def _secret_value(raw_value: str) -> str:
-    return raw_value.strip().strip('"\'')
+    return raw_value.strip().strip("\"'")
 
 
 def _is_hardcoded_secret_value(key: str, value: str) -> bool:

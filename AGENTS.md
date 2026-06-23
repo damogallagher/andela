@@ -19,6 +19,7 @@ This repository is for the Andela New Hire Challenge.
 
 - Build a Python-based, API-first Enterprise Security Guardrail Auditor.
 - Use Postgres as the database.
+- Do not add alternate runtime, test, or CI database paths; use a dedicated Postgres test database instead.
 - Load the database and application locally with `docker-compose.yaml`.
 - Provide a local dashboard for scan results and risk scoring.
 - Keep development and agent verification local-only. Do not create AWS, Azure, or other cloud resources from the local agent workspace.

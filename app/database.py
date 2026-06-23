@@ -1,8 +1,8 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.config import settings
 
@@ -12,12 +12,10 @@ class Base(DeclarativeBase):
 
 
 def build_engine(database_url: str):
-    options = {"pool_pre_ping": True}
-    if database_url.startswith("sqlite"):
-        options["connect_args"] = {"check_same_thread": False}
-        if database_url.endswith(":memory:"):
-            options["poolclass"] = StaticPool
-    return create_engine(database_url, **options)
+    parsed_url = make_url(database_url)
+    if not parsed_url.drivername.startswith("postgresql"):
+        raise ValueError("Only PostgreSQL database URLs are supported.")
+    return create_engine(database_url, pool_pre_ping=True)
 
 
 engine = build_engine(settings.database_url)

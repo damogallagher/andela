@@ -29,6 +29,22 @@ jobs:
   backend:
     name: Backend lint and tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: andela_guardrails_test
+          POSTGRES_USER: andela
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U andela -d andela_guardrails_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://andela@localhost:5432/andela_guardrails_test
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -63,6 +79,20 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: andela_guardrails_sarif
+          POSTGRES_USER: andela
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U andela -d andela_guardrails_sarif"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     permissions:
       actions: read
       contents: read
@@ -83,15 +113,13 @@ jobs:
       - name: Generate sample SARIF
         env:
           APP_SCAN_ROOT: ${{ github.workspace }}
-          DATABASE_URL: sqlite+pysqlite:///${{ github.workspace }}/sarif-ci.db
+          DATABASE_URL: postgresql+psycopg://andela@localhost:5432/andela_guardrails_sarif
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
 
           from fastapi.testclient import TestClient
-
-          Path("sarif-ci.db").unlink(missing_ok=True)
 
           from app.main import app
 
