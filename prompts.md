@@ -508,3 +508,11 @@ push the presentation fodler to github remote. both dev and main branch
 ```
 
 Agent action: Added the presentation source, deck, and image assets to version control, ignored temporary document lock files, pushed the update to `dev`, fast-forwarded `main`, pushed `main`, and verified both remote branches point at the same commit.
+
+## 2026-06-23 10:33 IST - Prompt 061 - Protect Main And Dev Branches
+
+```text
+I seethis warning on github.com, can you add protection for the dev and main branches?
+```
+
+Agent action: Recorded the branch protection request, synced the prompt log to `dev` and `main`, added GitHub branch protection rules for both branches with required CI/CD checks, disabled force pushes and deletion, and verified both branches are protected through the GitHub API.
