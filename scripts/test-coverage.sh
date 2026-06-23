@@ -5,10 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
+"${REPO_ROOT}/scripts/ensure-test-db.sh"
+
 if [[ -x ".venv/bin/python" ]]; then
   PYTHON=".venv/bin/python"
 else
   PYTHON="python3"
 fi
 
-"${PYTHON}" -m pytest tests/test_scanner.py tests/test_cli.py tests/test_sarif.py tests/test_observability.py "$@"
+"${PYTHON}" -m coverage erase
+"${PYTHON}" -m coverage run --source=app -m pytest tests "$@"
+"${PYTHON}" -m coverage report --fail-under=100 -m

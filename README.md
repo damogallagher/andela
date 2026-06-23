@@ -59,10 +59,12 @@ Architecture decisions are documented in [docs/adr](docs/adr/README.md), includi
 ## Run Locally
 
 ```bash
-cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD to a local-only database password.
+./scripts/init-env.sh
 docker compose up --build
 ```
+
+`./scripts/init-env.sh` creates a root `.env` file with `POSTGRES_PASSWORD=<generated-local-password>`.
+The `.env` file is intentionally ignored by Git. If you already have a `postgres17-data` Docker volume, keep using the same `POSTGRES_PASSWORD` that initialized that volume. If you do not need the old local scan history, reset the volume with `docker compose down -v` and then run `./scripts/init-env.sh` again.
 
 Open:
 
@@ -191,21 +193,22 @@ Secret findings redact evidence before persistence, dashboard display, CLI outpu
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install -r requirements-lock.txt
 ```
+
+`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full transitive Python dependency graph used by local verification and CI.
 
 Use the scripts directory to run linting and test scopes:
 
 ```bash
-cp .env.example .env
-# Edit .env and set POSTGRES_PASSWORD before starting Postgres.
-docker compose up -d db
+./scripts/init-env.sh
 ./scripts/lint-project.sh
 ./scripts/lint-all.sh
 ./scripts/lint-backend.sh
 ./scripts/lint-frontend.sh
 ./scripts/test-unit.sh
 ./scripts/test-functional.sh
+./scripts/test-coverage.sh
 ./scripts/test-playwright.sh
 ./scripts/test-all.sh
 ```
@@ -219,9 +222,17 @@ pre-commit run --all-files
 
 The pre-commit hook runs `./scripts/lint-all.sh`, which delegates to the same backend and frontend lint scripts used by CI.
 
-The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan comparison, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score trend, scan comparison, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
+The functional and full test scripts build the React frontend before running FastAPI tests. `test-coverage.sh` enforces 100% statement coverage for the Python `app` package, and `test-all.sh` runs that coverage gate before the Playwright browser suite. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan comparison, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, every `sample_iac/scenarios` variation, sample scan, score trend, scan comparison, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
 
 The Playwright config uses the local Vite dev server and mocked API responses for deterministic frontend coverage. It uses system Chrome by default; set `PLAYWRIGHT_USE_SYSTEM_CHROME=0` if you want to run with Playwright-managed browsers after installing them.
+
+Regenerate presentation screenshots:
+
+```bash
+./scripts/capture-screenshots.sh
+```
+
+The screenshots are written to `screenshots/` and use deterministic mocked scan data so they can be reused in the final presentation deck.
 
 ## GitHub Actions CI/CD
 
@@ -231,6 +242,7 @@ It performs:
 
 - Backend linting with Ruff and Python compile checks.
 - Python unit and functional tests.
+- 100% backend coverage enforcement for the Python `app` package.
 - UI linting with ESLint.
 - React production build.
 - Playwright browser tests.

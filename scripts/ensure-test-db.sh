@@ -5,13 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
-if [[ -f ".env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source ".env"
-  set +a
-fi
-
 if [[ -x ".venv/bin/python" ]]; then
   PYTHON=".venv/bin/python"
 else
@@ -19,11 +12,22 @@ else
 fi
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
-  if [[ -n "${POSTGRES_PASSWORD:-}" ]]; then
-    export DATABASE_URL="postgresql+psycopg://andela:${POSTGRES_PASSWORD}@localhost:5432/andela_guardrails_test"
+  TEST_POSTGRES_CONTAINER="${TEST_POSTGRES_CONTAINER:-andela-test-postgres}"
+  TEST_POSTGRES_PORT="${TEST_POSTGRES_PORT:-55432}"
+
+  if ! docker container inspect "${TEST_POSTGRES_CONTAINER}" >/dev/null 2>&1; then
+    docker run -d \
+      --name "${TEST_POSTGRES_CONTAINER}" \
+      -e POSTGRES_DB=andela_guardrails_test \
+      -e POSTGRES_USER=andela \
+      -e POSTGRES_HOST_AUTH_METHOD=trust \
+      -p "${TEST_POSTGRES_PORT}:5432" \
+      postgres:17-alpine >/dev/null
   else
-    export DATABASE_URL="postgresql+psycopg://andela@localhost:5432/andela_guardrails_test"
+    docker start "${TEST_POSTGRES_CONTAINER}" >/dev/null
   fi
+
+  export DATABASE_URL="postgresql+psycopg://andela@localhost:${TEST_POSTGRES_PORT}/andela_guardrails_test"
 fi
 
 "${PYTHON}" - <<'PY'

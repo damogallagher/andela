@@ -13,6 +13,9 @@ This repository is for the Andela New Hire Challenge.
 - `prompts.md` must record the prompt/instruction used, the date, and the agent action taken.
 - Keep `README.md` up to date whenever setup, run, test, architecture, or submission details change.
 - For any functionality touched, update the relevant unit or functional tests and the Playwright frontend tests before handoff.
+- Keep Python dependency changes reflected in both the direct requirements files and `requirements-lock.txt`.
+- Maintain 100% Python `app` package statement coverage through `./scripts/test-coverage.sh`.
+- Keep presentation screenshots in `screenshots/` current when dashboard visuals change.
 - Always run the complete test suite before handoff and report any command that could not run.
 
 ## Technical Direction

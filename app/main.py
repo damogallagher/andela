@@ -164,9 +164,6 @@ async def upload_scan(
             status_code=400,
             detail=f"Unsupported upload type for: {', '.join(unsupported_files)}. Supported extensions: {supported}.",
         )
-    if not scan_files_input:
-        raise HTTPException(status_code=400, detail="Upload at least one supported infrastructure file.")
-
     target_label = "uploaded: " + ", ".join(scan_file.file_path for scan_file in scan_files_input)
     result = scan_files(scan_files_input, target_label)
     return _persist_scan(label, result, db)

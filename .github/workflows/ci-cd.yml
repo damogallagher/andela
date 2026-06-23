@@ -63,7 +63,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-lock.txt
 
       - name: Lint backend
         run: ./scripts/lint-backend.sh
@@ -73,6 +73,9 @@ jobs:
 
       - name: Run functional tests
         run: ./scripts/test-functional.sh
+
+      - name: Enforce 100 percent backend coverage
+        run: ./scripts/test-coverage.sh
 
   code-scanning:
     name: Generate and upload SARIF
@@ -108,7 +111,7 @@ jobs:
           cache: pip
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-lock.txt
 
       - name: Generate sample SARIF
         env:
@@ -162,7 +165,7 @@ jobs:
           cache: pip
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-lock.txt
 
       - name: Verify risky fixtures fail on critical guardrail findings
         run: |

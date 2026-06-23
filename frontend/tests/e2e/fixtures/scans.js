@@ -114,6 +114,79 @@ export function uploadedScan(overrides = {}) {
   };
 }
 
+export function scenarioScans() {
+  return [
+    scenarioScan("both_risky", {
+      id: 801,
+      risk_score: 60,
+      files_scanned: 2,
+      created_at: "2026-06-22T22:10:00",
+      findings: [
+        makeFinding(80101, "critical", 1),
+        makeFinding(80102, "high", 1),
+        makeFinding(80103, "medium", 1),
+      ],
+    }),
+    scenarioScan("terraform_only", {
+      id: 802,
+      risk_score: 73,
+      files_scanned: 2,
+      created_at: "2026-06-22T22:00:00",
+      findings: [makeFinding(80201, "high", 1), makeFinding(80202, "medium", 1)],
+    }),
+    scenarioScan("json_only", {
+      id: 803,
+      risk_score: 60,
+      files_scanned: 2,
+      created_at: "2026-06-22T21:50:00",
+      findings: [
+        makeFinding(80301, "critical", 1),
+        makeFinding(80302, "high", 1, {
+          rule_id: "IAM_WILDCARD_POLICY",
+          title: "Wildcard IAM policy detected",
+          resource: "AWS::IAM::Role.AdminRole",
+          file_path: "sample_iac/scenarios/json_only/risky_cloudformation.json",
+          recommendation: "Replace wildcard actions and resources with least-privilege permissions.",
+          evidence: "\"Action\" and \"Resource\" both include \"*\"",
+        }),
+      ],
+    }),
+    scenarioScan("clean", {
+      id: 804,
+      risk_score: 100,
+      files_scanned: 2,
+      created_at: "2026-06-22T21:40:00",
+      findings: [],
+    }),
+    scenarioScan("large_violations", {
+      id: 805,
+      risk_score: 42,
+      files_scanned: 2,
+      created_at: "2026-06-22T21:30:00",
+      findings: [
+        ...Array.from({ length: 24 }, (_, index) => makeFinding(80500 + index, "critical", index + 1)),
+        ...Array.from({ length: 12 }, (_, index) => makeFinding(80600 + index, "high", index + 1)),
+        ...Array.from({ length: 12 }, (_, index) => makeFinding(80700 + index, "medium", index + 1)),
+        ...Array.from({ length: 12 }, (_, index) => makeFinding(80800 + index, "low", index + 1)),
+      ],
+    }),
+  ];
+}
+
+function scenarioScan(name, overrides) {
+  const findings = overrides.findings || [];
+  return {
+    id: overrides.id,
+    label: `Scenario: ${name}`,
+    target_path: `/workspace/sample_iac/scenarios/${name}`,
+    risk_score: overrides.risk_score,
+    files_scanned: overrides.files_scanned,
+    findings_count: findings.length,
+    created_at: overrides.created_at,
+    findings,
+  };
+}
+
 function scanSummary(scan) {
   return {
     id: scan.id,

@@ -418,7 +418,7 @@ Agent action: Clarified that `http://localhost:8000/` is the normal app URL and 
 Pin dependencies / lockfile for Python (requirements*.txt aren't pinned the way package-lock.json is) — relevant since you're adding Dependabot.
 ```
 
-Agent action: Not implemented yet; the later local runtime and database requests took priority before a Python lockfile was generated.
+Agent action: Added `requirements-lock.txt` from a clean install of the dev requirements, switched GitHub Actions Python dependency installation to the lockfile, and documented that local verification and CI use the locked transitive dependency set.
 
 ## 2026-06-23 01:23 IST - Prompt 050 - Expanded AWS And Azure Scanner Catalog
 
@@ -451,3 +451,20 @@ Fix githuardian issues: https://dashboard.gitguardian.com/workspace/565460/incid
 ```
 
 Agent action: Verified the current tracked source no longer contains the hardcoded Postgres password patterns, kept the local password in untracked `.env` flow, and adjusted the CI guardrail job so risky fixtures prove CLI failure behavior while the blocking gate scans the clean fixture.
+
+## 2026-06-23 01:54 IST - Prompt 054 - Production Readiness Verification Goal
+
+```text
+Ensure we have 100% unit test coverahe, 100% playwright coverage, test all flows using ALL variations of the sample_iac/scenarios files. Ensure all scripts work. Take screenshots and store in a screenshots directory so they can be used for the presentation. Ensure consistent documentation in README.md and that it is accurate. /goal is to have a production ready project. If you encounter issues, fix them and start the testing cycle again. Do you understand?
+```
+
+Agent action: Expanded backend unit, API, CLI, SARIF, scanner, and observability tests to reach 100% statement coverage for the Python `app` package; added a `test-coverage.sh` gate; expanded Playwright fixtures/specs to cover every `sample_iac/scenarios` variation; added deterministic presentation screenshot capture; updated README, AGENTS, CI, and dependency lockfile guidance.
+
+## 2026-06-23 01:54 IST - Prompt 055 - Local Compose Password Bootstrap Error
+
+```text
+docker-compose up
+error while interpolating services.db.environment.POSTGRES_PASSWORD: required variable POSTGRES_PASSWORD is missing a value: Set POSTGRES_PASSWORD in .env or your shell
+```
+
+Agent action: Added `./scripts/init-env.sh` to create or update an ignored root `.env` with a generated local `POSTGRES_PASSWORD`, updated Docker Compose's error guidance, allowed app settings to ignore unrelated `.env` keys, and documented first-run local setup plus existing Postgres volume behavior in README.

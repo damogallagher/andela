@@ -298,14 +298,9 @@ def _open_ssh_ingress(rule: Rule, context: ScanContext) -> list[FindingCandidate
             for ingress_rule in ingress_rules:
                 if not isinstance(ingress_rule, dict):
                     continue
-                exposes_ssh = (
-                    _safe_int(ingress_rule.get("FromPort"), -1)
-                    <= 22
-                    <= _safe_int(
-                        ingress_rule.get("ToPort"),
-                        -1,
-                    )
-                )
+                from_port = _safe_int(ingress_rule.get("FromPort"), 65535)
+                to_port = _safe_int(ingress_rule.get("ToPort"), -1)
+                exposes_ssh = from_port <= 22 <= to_port
                 world_open = ingress_rule.get("CidrIp") == "0.0.0.0/0" or ingress_rule.get("CidrIpv6") == "::/0"
                 if exposes_ssh and world_open:
                     findings.append(

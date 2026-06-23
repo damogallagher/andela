@@ -5,7 +5,12 @@ from app.scanner import (
     RULES,
     RULES_BY_ID,
     FindingCandidate,
+    ScanContext,
     ScanInputFile,
+    _iter_json_resources,
+    _json_key_line,
+    _line_at,
+    _provider_neutral_resource,
     calculate_risk_score,
     scan_files,
     scan_path,
@@ -188,6 +193,17 @@ def test_all_sample_iac_scenarios_are_scanned_together() -> None:
     assert result.risk_score == 47
 
 
+def test_unsupported_single_file_scan_returns_empty_result(tmp_path: Path) -> None:
+    notes = tmp_path / "notes.txt"
+    notes.write_text("not infrastructure", encoding="utf-8")
+
+    result = scan_path(notes)
+
+    assert result.files_scanned == 0
+    assert result.findings == []
+    assert result.risk_score == 100
+
+
 def test_scan_files_supports_uploaded_in_memory_content() -> None:
     result = scan_files(
         [
@@ -212,6 +228,159 @@ resource "aws_security_group" "admin" {
     assert result.files_scanned == 1
     assert result.risk_score == 55
     assert result.findings[0].rule_id == "OPEN_SSH_INGRESS"
+
+
+def test_scan_files_handles_invalid_and_unusual_json_shapes() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(file_path="broken.json", content="{not json"),
+            ScanInputFile(file_path="array.json", content='["not", "resources"]'),
+            ScanInputFile(
+                file_path="odd.template",
+                content="""
+{
+  "Resources": {
+    "BadResource": "not an object",
+    "Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": "not an object"
+    },
+    "VersionedBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "VersioningConfiguration": "Suspended"
+      }
+    }
+  }
+}
+""",
+            ),
+        ],
+        "uploaded: unusual-json",
+    )
+
+    assert result.files_scanned == 3
+    assert result.findings == []
+    assert result.risk_score == 100
+
+
+def test_json_rules_handle_policy_lists_ingress_dicts_and_invalid_ports() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="policy-list.json",
+                content="""
+{
+  "Resources": {
+    "AdminRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": {
+                "Action": "*",
+                "Resource": "*"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "InvalidPolicyRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": ["not an object"]
+        }
+      }
+    },
+    "SecurityGroupDict": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "SecurityGroupIngress": {
+          "FromPort": 22,
+          "ToPort": 22,
+          "CidrIp": "0.0.0.0/0"
+        }
+      }
+    },
+    "SecurityGroupInvalid": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "SecurityGroupIngress": [
+          "not an object",
+          {
+            "FromPort": "not-a-port",
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    }
+  }
+}
+""",
+            )
+        ],
+        "uploaded: policy-list.json",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter(
+        {
+            "IAM_WILDCARD_POLICY": 1,
+            "OPEN_SSH_INGRESS": 1,
+        }
+    )
+
+
+def test_non_json_policy_document_fallback_detects_wildcard_iam_policy() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="inline_policy.yaml",
+                content="""
+Statement:
+  - "Action": "*"
+    "Resource": "*"
+""",
+            )
+        ],
+        "uploaded: inline_policy.yaml",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter({"IAM_WILDCARD_POLICY": 1})
+    assert result.findings[0].resource == "IAM policy document"
+
+
+def test_json_policy_wildcard_check_ignores_non_string_and_non_list_values() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="non-wildcard-policy.json",
+                content="""
+{
+  "Resources": {
+    "DynamicPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": {
+            "Action": {"Fn::Join": ["", ["s3:", "*"]]},
+            "Resource": "*"
+          }
+        }
+      }
+    }
+  }
+}
+""",
+            )
+        ],
+        "uploaded: non-wildcard-policy.json",
+    )
+
+    assert result.findings == []
 
 
 def test_scan_files_detects_and_redacts_hardcoded_secrets() -> None:
@@ -248,6 +417,80 @@ resource "null_resource" "app_config" {{
     assert all("example-password-01" not in finding.evidence for finding in result.findings)
 
 
+def test_secret_rule_ignores_placeholders_variables_and_duplicate_lines() -> None:
+    aws_access_key = "AKIA" + ("2" * 16)
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="secret_edges.tf",
+                content=f"""
+resource "null_resource" "config" {{
+  triggers = {{
+    placeholder_password = "todo"
+    variable_secret      = var.secret_value
+    short_api_token      = "short"
+    access_key           = "{aws_access_key}" # admin_password = "duplicate-password"
+  }}
+}}
+""",
+            )
+        ],
+        "uploaded: secret_edges.tf",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter({"HARDCODED_SECRET": 1})
+    assert (
+        result.findings[0].evidence
+        == 'access_key           = "AKIA****************" # admin_password = "duplicate-password"'
+    )
+
+
+def test_secret_rule_reports_only_first_aws_key_per_line() -> None:
+    first_key = "AKIA" + ("3" * 16)
+    second_key = "AKIA" + ("4" * 16)
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="same_line_keys.tf",
+                content=f"""
+resource "null_resource" "config" {{
+  triggers = {{ first_access_key = "{first_key}" second_access_key = "{second_key}" }}
+}}
+""",
+            )
+        ],
+        "uploaded: same_line_keys.tf",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter({"HARDCODED_SECRET": 1})
+    assert first_key not in result.findings[0].evidence
+    assert second_key not in result.findings[0].evidence
+
+
+def test_s3_versioning_and_catalog_rules_ignore_safe_or_duplicate_matches() -> None:
+    result = scan_files(
+        [
+            ScanInputFile(
+                file_path="edge_rules.tf",
+                content="""
+resource "aws_s3_bucket" "versioned" {
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_ebs_volume" "data" {
+  encrypted = false encrypted = false
+}
+""",
+            )
+        ],
+        "uploaded: edge_rules.tf",
+    )
+
+    assert Counter(finding.rule_id for finding in result.findings) == Counter({"AWS_EBS_VOLUME_ENCRYPTED_DISABLED": 1})
+
+
 def test_risk_score_uses_weighted_density_without_zero_saturation() -> None:
     four_critical_findings = [make_finding("critical", index) for index in range(4)]
     ten_critical_findings = [make_finding("critical", index) for index in range(10)]
@@ -259,3 +502,13 @@ def test_risk_score_uses_weighted_density_without_zero_saturation() -> None:
     assert calculate_risk_score([], files_scanned=20) == 100
     assert 0 < ten_critical_score < four_critical_score < 100
     assert broader_scope_score > four_critical_score
+
+
+def test_scanner_helper_edges() -> None:
+    empty_json_context = ScanContext(file_path="main.tf", content="", json_resources=None)
+
+    assert list(_iter_json_resources(empty_json_context)) == []
+    assert _provider_neutral_resource("CUSTOM", "custom_resource") == "resource"
+    assert _provider_neutral_resource("CUSTOM", "third_party_resource") == "third_party_resource"
+    assert _line_at("single line", 3) == "single line"
+    assert _json_key_line("{}", "Missing") == 1
