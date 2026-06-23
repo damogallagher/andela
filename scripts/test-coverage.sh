@@ -7,11 +7,7 @@ cd "${REPO_ROOT}"
 
 "${REPO_ROOT}/scripts/ensure-test-db.sh"
 
-if [[ -x ".venv/bin/python" ]]; then
-  PYTHON=".venv/bin/python"
-else
-  PYTHON="python3"
-fi
+PYTHON="$(bash "${REPO_ROOT}/scripts/python-bin.sh")"
 
 "${PYTHON}" -m coverage erase
 "${PYTHON}" -m coverage run --source=app -m pytest tests "$@"

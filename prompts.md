@@ -476,3 +476,11 @@ Update code and instructions to use phthon13
 ```
 
 Agent action: Interpreted `phthon13` as Python 3.13, updated GitHub Actions Python setup, the Docker runtime base image, README local verification instructions, and prompt history to target Python 3.13.
+
+## 2026-06-23 09:02 IST - Prompt 057 - Full Test Loop Verification
+
+```text
+Run ALL unit tests, playwright tests ect when done. Ensure no errors, fix and repeat. Get into a loop of test, identify, fix, test
+```
+
+Agent action: Ran the full lint and test gates, identified that local backend scripts could silently fall back to macOS Python 3.9, added a shared Python 3.13 resolver for backend lint/test/setup scripts, updated README guidance, and reran the full gate under the corrected Python 3.13 path.

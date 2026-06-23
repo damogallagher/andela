@@ -196,7 +196,7 @@ source .venv/bin/activate
 pip install -r requirements-lock.txt
 ```
 
-`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full Python 3.13 transitive dependency graph used by CI and exact local verification. If your machine only has the macOS system Python 3.9, install `requirements-dev.txt` for local development or install Python 3.13 for CI parity.
+`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full Python 3.13 transitive dependency graph used by CI and exact local verification. The backend lint and test scripts require Python 3.13 and will fail fast instead of falling back to the macOS system Python 3.9. Install Python 3.13 locally, create `.venv` with Python 3.13, or set `PYTHON` to a Python 3.13 interpreter.
 
 Use the scripts directory to run linting and test scopes:
 
