@@ -391,3 +391,11 @@ is the README.md file up to date in terms of the url for viewing the frontend?
 ```
 
 Agent action: Confirmed the README lists the built FastAPI-served dashboard at `http://localhost:8000` and the Vite auto-refresh dashboard at `http://localhost:5173/static/frontend/`.
+
+## 2026-06-23 01:16 IST - Prompt 047 - Repository Hygiene And Pre-Commit Gate
+
+```text
+Repo hygiene: LICENSE, SECURITY.md, CHANGELOG.md, .editorconfig, and a pre-commit config wiring up the lint scripts you're adding in steer #5 (so CI and local use the same gate).
+```
+
+Agent action: Added MIT license, security policy, changelog, editor configuration, pre-commit configuration, pre-commit dev dependency, README setup details, and aligned the CI frontend lint step with the shared lint script.

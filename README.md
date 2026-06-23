@@ -17,6 +17,7 @@ Local development is intentionally Docker Compose based. Optional AWS deployment
 - Playwright for frontend browser tests
 - Ruff and ESLint for backend and UI linting
 - Terraform and GitHub Actions for optional AWS deployment
+- pre-commit for local lint gate parity with CI
 
 ## Architecture
 
@@ -200,6 +201,15 @@ Use the scripts directory to run linting and test scopes:
 ./scripts/test-playwright.sh
 ./scripts/test-all.sh
 ```
+
+Install the local pre-commit gate:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+The pre-commit hook runs `./scripts/lint-all.sh`, which delegates to the same backend and frontend lint scripts used by CI.
 
 The functional and full test scripts build the React frontend before running FastAPI tests. `test-all.sh` also runs the Playwright browser suite after the Python tests. The test suite includes scanner and CLI unit tests for each fixture scenario and threshold exit codes, FastAPI functional tests for scan creation, scan comparison, scan history, scan detail lookup, SARIF export, dashboard serving, rules metadata, missing paths, and scan-root path safety, plus Playwright coverage for the React dashboard empty/loading/error states, sample scan, score trend, scan comparison, score color thresholds, severity filtering, breadcrumbs, search, sorting, horizontal table scrolling, pagination, SARIF download, uploads, scan history, desktop history placement, and mobile-width usability.
 
