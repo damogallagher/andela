@@ -500,3 +500,11 @@ can you push the latest code to dev and main?
 ```
 
 Agent action: Recorded the push request, pushed the latest `dev` branch state, fast-forwarded `main` to match `dev`, pushed `main`, and verified both remote branches point at the same commit.
+
+## 2026-06-23 10:29 IST - Prompt 060 - Publish Presentation Folder
+
+```text
+push the presentation fodler to github remote. both dev and main branch
+```
+
+Agent action: Added the presentation source, deck, and image assets to version control, ignored temporary document lock files, pushed the update to `dev`, fast-forwarded `main`, pushed `main`, and verified both remote branches point at the same commit.

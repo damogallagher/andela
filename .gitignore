@@ -1,4 +1,5 @@
 .DS_Store
+.~lock.*#
 .env
 .venv/
 __pycache__/
