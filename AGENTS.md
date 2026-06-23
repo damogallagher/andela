@@ -12,6 +12,7 @@ This repository is for the Andela New Hire Challenge.
 - Maintain `prompts.md` after every user instruction or implementation turn.
 - `prompts.md` must record the prompt/instruction used, the date, and the agent action taken.
 - Keep `README.md` up to date whenever setup, run, test, architecture, or submission details change.
+- Keep `CLAUDE.md` aligned with agent, runtime, test, and branch workflow changes.
 - For any functionality touched, update the relevant unit or functional tests and the Playwright frontend tests before handoff.
 - Keep Python dependency changes reflected in both the direct requirements files and `requirements-lock.txt`.
 - Maintain 100% Python `app` package statement coverage through `./scripts/test-coverage.sh`.
@@ -21,6 +22,8 @@ This repository is for the Andela New Hire Challenge.
 ## Technical Direction
 
 - Build a Python-based, API-first Enterprise Security Guardrail Auditor.
+- Use standard CPython 3.14 for local verification, CI, and the Docker runtime.
+- Do not use free-threaded Python builds unless dependency wheel support has been explicitly verified.
 - Use Postgres as the database.
 - Do not add alternate runtime, test, or CI database paths; use a dedicated Postgres test database instead.
 - Load the database and application locally with `docker-compose.yaml`.

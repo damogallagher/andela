@@ -53,7 +53,7 @@ Architecture decisions are documented in [docs/adr](docs/adr/README.md), includi
 ## Coding Agent And Model
 
 - Coding agent: OpenAI Codex, running in the Codex desktop app.
-- Model used: GPT-5.5
+- Model used: GPT-5
 - Workflow: the coding agent generated and edited the application code, maintained `prompts.md`, updated documentation, ran verification commands, and published the repository.
 
 ## Run Locally
@@ -86,6 +86,8 @@ The default Compose configuration starts:
 - `andela-frontend` on port `5173` for Vite hot reload during React development
 
 The API runs Alembic migrations on startup, so local Docker Compose and CI use the versioned schema in `alembic/versions` instead of `Base.metadata.create_all`. The runtime expects a PostgreSQL `DATABASE_URL`.
+
+Local Python scripts target standard CPython 3.14. Free-threaded Python builds are skipped by `scripts/python-bin.sh` by default because pinned binary dependencies may not publish wheels for that ABI.
 
 Postgres 17 uses the `postgres17-data` Docker volume. If you previously ran the project with Postgres 16, the old `postgres-data` volume is left untouched because Postgres data directories are not major-version compatible in place. Once you no longer need old local scan history, remove that old volume manually with `docker volume rm andela_postgres-data`.
 
@@ -191,12 +193,12 @@ Secret findings redact evidence before persistence, dashboard display, CLI outpu
 ## Run Tests
 
 ```bash
-python3.13 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-lock.txt
 ```
 
-`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full Python 3.13 transitive dependency graph used by CI and exact local verification. The backend lint and test scripts require Python 3.13 and will fail fast instead of falling back to the macOS system Python 3.9. Install Python 3.13 locally, create `.venv` with Python 3.13, or set `PYTHON` to a Python 3.13 interpreter.
+`requirements.txt` and `requirements-dev.txt` define the direct runtime and development requirements. `requirements-lock.txt` pins the full Python 3.14 transitive dependency graph used by CI and exact local verification. The backend lint and test scripts require Python 3.14 and will fail fast instead of falling back to the macOS system Python 3.9. Install Python 3.14 locally, create `.venv` with Python 3.14, or set `PYTHON` to a Python 3.14 interpreter.
 
 Use the scripts directory to run linting and test scopes:
 
