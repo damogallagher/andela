@@ -1,7 +1,7 @@
-fastapi==0.138.0
+fastapi==0.138.1
 uvicorn[standard]==0.49.0
 SQLAlchemy==2.0.51
-alembic==1.18.4
+alembic==1.18.5
 psycopg[binary]==3.3.4
 pydantic-settings==2.14.2
 Jinja2==3.1.6
